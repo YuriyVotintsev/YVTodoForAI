@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <plugins>
-  <plugin id="com.aireview.rider-comments-plugin" url="https://github.com/YuriyVotintsev/YVTodoForAI/releases/download/v0.1.0/rider-comments-plugin-0.1.0.zip" version="0.1.0">
+  <plugin id="com.yuriyvot.YVTodoForAI" url="https://github.com/YuriyVotintsev/YVTodoForAI/releases/download/v0.1.0/YVTodoForAI-0.1.0.zip" version="0.1.0">
     <idea-version since-build="253" until-build="253.*"/>
-    <name>AI Review Comments</name>
+    <name>YVTodoForAI</name>
     <description>Create code review comments for AI assistants. Select code, press Ctrl+Shift+R to add a comment.</description>
     <vendor>YuriyVotintsev</vendor>
   </plugin>

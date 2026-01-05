@@ -4,7 +4,7 @@ plugins {
     id("org.jetbrains.intellij.platform") version "2.10.4"
 }
 
-group = "com.aireview"
+group = "com.yuriyvot"
 version = "0.1.0"
 
 repositories {

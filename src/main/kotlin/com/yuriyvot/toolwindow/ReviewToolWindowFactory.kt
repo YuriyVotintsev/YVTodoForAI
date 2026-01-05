@@ -1,4 +1,4 @@
-package com.aireview.toolwindow
+package com.yuriyvot.toolwindow
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow

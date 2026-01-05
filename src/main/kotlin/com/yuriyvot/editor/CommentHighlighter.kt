@@ -1,8 +1,8 @@
-package com.aireview.editor
+package com.yuriyvot.editor
 
-import com.aireview.model.CommentStatus
-import com.aireview.model.ReviewComment
-import com.aireview.services.CommentStorageService
+import com.yuriyvot.model.CommentStatus
+import com.yuriyvot.model.ReviewComment
+import com.yuriyvot.services.CommentStorageService
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.editor.Editor

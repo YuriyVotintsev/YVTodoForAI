@@ -1,4 +1,4 @@
-package com.aireview.services
+package com.yuriyvot.services
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.startup.ProjectActivity

@@ -1,7 +1,7 @@
-package com.aireview.services
+package com.yuriyvot.services
 
-import com.aireview.model.CommentStatus
-import com.aireview.model.ReviewComment
+import com.yuriyvot.model.CommentStatus
+import com.yuriyvot.model.ReviewComment
 import com.google.gson.GsonBuilder
 import com.google.gson.reflect.TypeToken
 import com.intellij.openapi.components.Service

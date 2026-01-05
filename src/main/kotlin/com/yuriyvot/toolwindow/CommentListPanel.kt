@@ -1,10 +1,10 @@
-package com.aireview.toolwindow
+package com.yuriyvot.toolwindow
 
-import com.aireview.editor.CommentNavigator
-import com.aireview.model.CommentStatus
-import com.aireview.model.ReviewComment
-import com.aireview.services.CommentStorageService
-import com.aireview.ui.AddCommentDialog
+import com.yuriyvot.editor.CommentNavigator
+import com.yuriyvot.model.CommentStatus
+import com.yuriyvot.model.ReviewComment
+import com.yuriyvot.services.CommentStorageService
+import com.yuriyvot.ui.AddCommentDialog
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.OpenFileDescriptor
 import com.intellij.openapi.project.Project

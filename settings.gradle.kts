@@ -5,4 +5,4 @@ pluginManagement {
     }
 }
 
-rootProject.name = "rider-comments-plugin"
+rootProject.name = "YVTodoForAI"

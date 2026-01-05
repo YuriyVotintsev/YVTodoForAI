@@ -1,4 +1,4 @@
-package com.aireview.model
+package com.yuriyvot.model
 
 import java.util.UUID
 

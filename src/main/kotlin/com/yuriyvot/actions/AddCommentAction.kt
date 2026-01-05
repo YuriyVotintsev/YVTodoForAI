@@ -1,8 +1,8 @@
-package com.aireview.actions
+package com.yuriyvot.actions
 
-import com.aireview.model.ReviewComment
-import com.aireview.services.CommentStorageService
-import com.aireview.ui.AddCommentDialog
+import com.yuriyvot.model.ReviewComment
+import com.yuriyvot.services.CommentStorageService
+import com.yuriyvot.ui.AddCommentDialog
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.actionSystem.CommonDataKeys

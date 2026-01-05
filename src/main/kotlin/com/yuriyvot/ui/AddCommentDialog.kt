@@ -1,4 +1,4 @@
-package com.aireview.ui
+package com.yuriyvot.ui
 
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper

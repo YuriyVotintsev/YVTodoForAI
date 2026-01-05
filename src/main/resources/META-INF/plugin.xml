@@ -1,6 +1,6 @@
 <idea-plugin>
-    <id>com.aireview.rider-comments-plugin</id>
-    <name>AI Review Comments</name>
+    <id>com.yuriyvot.YVTodoForAI</id>
+    <name>YVTodoForAI</name>
     <version>1.0.0</version>
     <vendor>AI Review</vendor>
 
@@ -13,21 +13,21 @@
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <projectService serviceImplementation="com.aireview.services.CommentStorageService"/>
+        <projectService serviceImplementation="com.yuriyvot.services.CommentStorageService"/>
 
         <toolWindow id="AI Review"
                     anchor="bottom"
                     secondary="false"
                     icon="AllIcons.Actions.Preview"
-                    factoryClass="com.aireview.toolwindow.ReviewToolWindowFactory"/>
+                    factoryClass="com.yuriyvot.toolwindow.ReviewToolWindowFactory"/>
 
-        <postStartupActivity implementation="com.aireview.editor.CommentHighlighter"/>
-        <postStartupActivity implementation="com.aireview.services.StatusFileWatcher"/>
+        <postStartupActivity implementation="com.yuriyvot.editor.CommentHighlighter"/>
+        <postStartupActivity implementation="com.yuriyvot.services.StatusFileWatcher"/>
     </extensions>
 
     <actions>
         <action id="AIReview.AddComment"
-                class="com.aireview.actions.AddCommentAction"
+                class="com.yuriyvot.actions.AddCommentAction"
                 text="Add Review Comment"
                 description="Add a review comment for AI assistant">
             <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift R"/>
