@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.aireview"
-version = "1.0.0"
+version = "0.1.0"
 
 repositories {
     mavenCentral()
@@ -24,6 +24,10 @@ dependencies {
 
 kotlin {
     jvmToolchain(21)
+}
+
+intellijPlatform {
+    buildSearchableOptions = false
 }
 
 tasks {
