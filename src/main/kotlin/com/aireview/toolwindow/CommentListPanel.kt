@@ -1,5 +1,6 @@
 package com.aireview.toolwindow
 
+import com.aireview.editor.CommentNavigator
 import com.aireview.model.CommentStatus
 import com.aireview.model.ReviewComment
 import com.aireview.services.CommentStorageService
@@ -54,6 +55,18 @@ class CommentListPanel(private val project: Project) : JPanel(BorderLayout()) {
 
         storage.addChangeListener { refreshList() }
         refreshList()
+
+        CommentNavigator.registerSelectCallback { commentId ->
+            selectCommentById(commentId)
+        }
+    }
+
+    private fun selectCommentById(commentId: String) {
+        val index = comments.indexOfFirst { it.id == commentId }
+        if (index >= 0) {
+            table.setRowSelectionInterval(index, index)
+            table.scrollRectToVisible(table.getCellRect(index, 0, true))
+        }
     }
 
     private fun setupSplitPane() {
