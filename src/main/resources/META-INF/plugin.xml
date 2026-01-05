@@ -1,0 +1,37 @@
+<idea-plugin>
+    <id>com.aireview.rider-comments-plugin</id>
+    <name>AI Review Comments</name>
+    <version>1.0.0</version>
+    <vendor>AI Review</vendor>
+
+    <description><![CDATA[
+    Create code review comments and export them for AI assistants.
+    Select code, press Ctrl+Alt+/ to add a comment.
+    AI can read and update comments status via JSON file.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <projectService serviceImplementation="com.aireview.services.CommentStorageService"/>
+
+        <toolWindow id="AI Review"
+                    anchor="bottom"
+                    secondary="false"
+                    icon="AllIcons.Actions.Preview"
+                    factoryClass="com.aireview.toolwindow.ReviewToolWindowFactory"/>
+
+        <postStartupActivity implementation="com.aireview.editor.CommentHighlighter"/>
+        <postStartupActivity implementation="com.aireview.services.StatusFileWatcher"/>
+    </extensions>
+
+    <actions>
+        <action id="AIReview.AddComment"
+                class="com.aireview.actions.AddCommentAction"
+                text="Add Review Comment"
+                description="Add a review comment for AI assistant">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift R"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+        </action>
+    </actions>
+</idea-plugin>
