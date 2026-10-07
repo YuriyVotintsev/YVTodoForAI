@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "com.yuriyvot"
-version = "0.1.0"
+version = "0.4.8"
 
 repositories {
     mavenCentral()
@@ -14,12 +14,19 @@ repositories {
     }
 }
 
+val ideLocalPath = providers.gradleProperty("ideLocalPath")
+
 dependencies {
     intellijPlatform {
-        rider("2025.3.1") {
-            useInstaller = false
+        if (ideLocalPath.isPresent && file(ideLocalPath.get()).exists()) {
+            local(ideLocalPath.get())
+        } else {
+            rider("2025.3.1") {
+                useInstaller = false
+            }
         }
     }
+    testImplementation("junit:junit:4.13.2")
 }
 
 kotlin {
@@ -28,11 +35,10 @@ kotlin {
 
 intellijPlatform {
     buildSearchableOptions = false
-}
-
-tasks {
-    patchPluginXml {
-        sinceBuild.set("253")
-        untilBuild.set("253.*")
+    pluginConfiguration {
+        ideaVersion {
+            sinceBuild = "253"
+            untilBuild = provider { null }
+        }
     }
 }

@@ -1,37 +1,50 @@
 <idea-plugin>
     <id>com.yuriyvot.YVTodoForAI</id>
     <name>YVTodoForAI</name>
-    <version>1.0.0</version>
-    <vendor>AI Review</vendor>
+    <vendor>YuriyVotintsev</vendor>
 
     <description><![CDATA[
-    Create code review comments and export them for AI assistants.
-    Select code, press Ctrl+Alt+/ to add a comment.
-    AI can read and update comments status via JSON file.
+    Code review comments for an AI assistant (Claude Code).
+    <ul>
+      <li>Comment a selection, the current line, a file or a folder (Ctrl+Alt+,).</li>
+      <li>Explorer → AI Review: all changes of the current branch (or of selected commits); every file opens
+          in its own diff tab where you can comment right in the diff.</li>
+      <li>Comments are stored in <code>.ai-review-comments.json</code> and processed by <code>/review_comments</code>.</li>
+    </ul>
     ]]></description>
 
     <depends>com.intellij.modules.platform</depends>
 
     <extensions defaultExtensionNs="com.intellij">
-        <projectService serviceImplementation="com.yuriyvot.services.CommentStorageService"/>
-
+        <fileEditorProvider implementation="com.yuriyvot.aireview.diffview.ReviewFileEditorProvider"/>
+        <editorTabTitleProvider implementation="com.yuriyvot.aireview.diffview.ReviewFileTabTitleProvider"/>
+        <projectViewPane implementation="com.yuriyvot.aireview.pane.ReviewChangesPane" order="last"/>
         <toolWindow id="AI Review"
                     anchor="bottom"
-                    secondary="false"
-                    icon="AllIcons.Actions.Preview"
-                    factoryClass="com.yuriyvot.toolwindow.ReviewToolWindowFactory"/>
-
-        <postStartupActivity implementation="com.yuriyvot.editor.CommentHighlighter"/>
-        <postStartupActivity implementation="com.yuriyvot.services.StatusFileWatcher"/>
+                    icon="AllIcons.Toolwindows.ToolWindowMessages"
+                    factoryClass="com.yuriyvot.aireview.toolwindow.CommentsToolWindowFactory"/>
+        <postStartupActivity implementation="com.yuriyvot.aireview.editor.CommentMarkersStartup"/>
+        <notificationGroup id="AI Review" displayType="BALLOON"/>
     </extensions>
 
     <actions>
         <action id="AIReview.AddComment"
-                class="com.yuriyvot.actions.AddCommentAction"
-                text="Add Review Comment"
-                description="Add a review comment for AI assistant">
-            <keyboard-shortcut keymap="$default" first-keystroke="ctrl shift R"/>
-            <add-to-group group-id="EditorPopupMenu" anchor="last"/>
+                class="com.yuriyvot.aireview.actions.AddCommentAction"
+                text="Комментарий для Claude…"
+                description="Оставить комментарий для Claude к коду, файлу или папке"
+                icon="AllIcons.General.Balloon">
+            <keyboard-shortcut keymap="$default" first-keystroke="ctrl alt COMMA"/>
+            <add-to-group group-id="EditorPopupMenu" anchor="first"/>
+            <add-to-group group-id="ProjectViewPopupMenu" anchor="first"/>
+            <add-to-group group-id="SolutionExplorerPopupMenu" anchor="first"/>
+            <add-to-group group-id="EditorTabPopupMenu" anchor="last"/>
+        </action>
+        <action id="AIReview.CompareCommits"
+                class="com.yuriyvot.aireview.actions.CompareCommitsAction"
+                text="AI Review: изменения коммита"
+                description="Показать изменения выбранного коммита или разницу между двумя коммитами"
+                icon="AllIcons.Actions.Diff">
+            <add-to-group group-id="Vcs.Log.ContextMenu" anchor="first"/>
         </action>
     </actions>
 </idea-plugin>
