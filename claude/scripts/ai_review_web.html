@@ -80,7 +80,7 @@ svg { flex: none; }
 .list { flex: 1; overflow: auto; padding: 2px 6px 8px; min-height: 0; }
 .vl { position: relative; }
 .vw { position: absolute; left: 0; right: 0; top: 0; }
-.it { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; min-width: 0; font-size: 13.5px; contain: layout paint; }
+.it { display: flex; align-items: center; gap: 7px; height: 32px; padding: 0 8px; border-radius: 8px; cursor: pointer; white-space: nowrap; min-width: 0; font-size: 13.5px; contain: layout paint; position: relative; }
 .it:hover { background: var(--raise); }
 .it.act { background: var(--raise); box-shadow: inset 2px 0 0 var(--accent); }
 .it .fi { color: var(--dim); display: grid; place-items: center; width: 16px; }
@@ -127,7 +127,8 @@ svg { flex: none; }
 .it.dir .fi { color: var(--faint); }
 .it.dir.hc .fi { color: var(--accent); }
 .dcnt { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
-.it .dcb { width: 24px; height: 24px; margin-left: auto; opacity: 0; }
+.it .dcb { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; opacity: 0; background: var(--raise); box-shadow: -12px 0 8px -4px var(--raise); }
+.it .dcb:hover { background: var(--border-strong); }
 .it:hover .dcb { opacity: 1; }
 .pop { position: fixed; z-index: 25; }
 .fpath { font-family: var(--mono); font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; min-width: 0; flex: 1; text-align: left; }
