@@ -12,7 +12,7 @@
   --add: rgba(46,160,67,.11); --add-g: rgba(46,160,67,.19); --del: rgba(220,60,50,.09); --del-g: rgba(220,60,50,.17);
   --accent: #2f6fe4; --accent-soft: rgba(47,111,228,.12); --sel: rgba(47,111,228,.14);
   --hunk: #f0eee7; --shadow: 0 6px 22px rgba(0,0,0,.08); --scrim: rgba(30,28,24,.28);
-  --claude: #c96442; --amber: #b7791f;
+  --claude: #c96442; --amber: #b7791f; --sky: #1b8ad3;
   --k: #8a3ccf; --s: #9a6700; --c: #8b887f; --nm: #b4580c; --ty: #0b6a9e; --pp: #6e56cf;
   --ui: "Styrene B", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: ui-monospace, "JetBrains Mono", "Cascadia Code", "SF Mono", Consolas, monospace;
@@ -25,7 +25,7 @@
     --add: rgba(70,150,95,.16); --add-g: rgba(70,150,95,.26); --del: rgba(229,83,75,.14); --del-g: rgba(229,83,75,.24);
     --accent: #3b7ff2; --accent-soft: rgba(59,127,242,.2); --sel: rgba(90,135,215,.2);
     --hunk: #2b2b29; --shadow: 0 10px 30px rgba(0,0,0,.4); --scrim: rgba(0,0,0,.5);
-    --claude: #d97757; --amber: #e0a43a;
+    --claude: #d97757; --amber: #e0a43a; --sky: #6cc4ff;
     --k: #c9a2f2; --s: #e3c08d; --c: #807d75; --nm: #f0a774; --ty: #86c6ec; --pp: #b4a6ff;
   }
 }
@@ -126,7 +126,10 @@ svg { flex: none; }
 .it.dir .nm { color: var(--text-2); }
 .it.dir .fi { color: var(--faint); }
 .it.dir.hc .fi { color: var(--accent); }
-.dcnt { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
+.dcnt { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; flex: none; }
+.dcnt .dn { color: var(--sky); }
+.it.dir .nm { min-width: 0; }
+.it.dir.leaf .chev { visibility: hidden; }
 .it .dcb { position: absolute; right: 4px; top: 4px; width: 24px; height: 24px; opacity: 0; background: var(--raise); box-shadow: -12px 0 8px -4px var(--raise); }
 .it .dcb:hover { background: var(--border-strong); }
 .it:hover .dcb { opacity: 1; }
@@ -418,7 +421,7 @@ const S = {
   sel: null, drag: false, composer: null, pendingDiff: null, deleteArm: null, editing: null, editingMsg: null, gen: false,
   expanded: new Set(), forceBig: new Set(), editor: null, presetDeleteArm: false,
   opts: { ws: false, inv: false, wrap: true, ctx: 3, full: false, ...JSON.parse(store.get('diffOpts') || '{}') },
-  listMode: store.get('listMode') === 'tree' ? 'tree' : 'list', collapsed: new Set(JSON.parse(store.get('collapsed') || '[]')), collapsedVer: 0,
+  listMode: ['tree', 'dirs'].includes(store.get('listMode')) ? store.get('listMode') : 'list', collapsed: new Set(JSON.parse(store.get('collapsed') || '[]')), collapsedVer: 0,
   openCard: null, folderDraft: null, restoreSel: null,
 };
 const CTX_STEPS = [0, 1, 3, 5, 10, 25, 50, 100];
@@ -810,12 +813,14 @@ function dirItemHtml(row) {
   const d = row.dir;
   const all = dirComments(d.path);
   const n = openCount(all);
-  return `<div class="it dir${row.open ? ' open' : ''}${all.length ? ' hc' : ''}" data-dir="${esc(d.path)}" title="${esc(d.path)}/ · ${d.count} files" style="padding-left:${8 + row.depth * 14}px"><span class="chev">${I.chev}</span><span class="fi">${I.folder}</span><span class="nm">${esc(row.label)}</span><span class="dcnt">${d.count}</span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}<button class="ib dcb" data-act="folder-comment" data-dir="${esc(d.path)}" title="Comment on this folder">${I.bubble}</button></div>`;
+  const title = `${d.path}/ · ${d.files.length} files here, ${d.count} with subfolders · Alt+click folds or unfolds every subfolder`;
+  return `<div class="it dir${row.open ? ' open' : ''}${row.isLeaf ? ' leaf' : ''}${all.length ? ' hc' : ''}" data-dir="${esc(d.path)}" title="${esc(title)}" style="padding-left:${8 + row.depth * 14}px"><span class="chev">${I.chev}</span><span class="fi">${I.folder}</span><span class="nm">${esc(row.label)}</span><span class="dcnt"><span class="${d.files.length ? 'dn' : ''}">${d.files.length}</span> (${d.count})</span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}<button class="ib dcb" data-act="folder-comment" data-dir="${esc(d.path)}" title="Comment on this folder">${I.bubble}</button></div>`;
 }
-let treeMemo = { list: null, ver: -1, rows: [] };
+let treeMemo = { list: null, ver: -1, mode: '', rows: [] };
 function treeRows() {
   const list = visible();
-  if (treeMemo.list === list && treeMemo.ver === S.collapsedVer) return treeMemo.rows;
+  const isDirsOnly = S.listMode === 'dirs';
+  if (treeMemo.list === list && treeMemo.ver === S.collapsedVer && treeMemo.mode === S.listMode) return treeMemo.rows;
   const root = { path: '', dirs: new Map(), files: [] };
   for (const f of list) {
     const parts = f.path.split('/');
@@ -835,24 +840,34 @@ function treeRows() {
       let cur = d, label = d.name;
       while (!cur.files.length && cur.dirs.size === 1) { cur = cur.dirs.values().next().value; label += '/' + cur.name; }
       const open = !S.collapsed.has(cur.path);
-      rows.push({ dir: cur, label, depth, open });
+      rows.push({ dir: cur, label, depth, open, isLeaf: isDirsOnly && !cur.dirs.size });
       if (open) walk(cur, depth + 1);
     }
-    for (const f of node.files) rows.push({ f, depth });
+    if (!isDirsOnly) for (const f of node.files) rows.push({ f, depth });
   };
   walk(root, 0);
-  treeMemo = { list, ver: S.collapsedVer, rows };
+  treeMemo = { list, ver: S.collapsedVer, mode: S.listMode, rows };
   return rows;
 }
 let flatMemo = { list: null, rows: [] };
 function listRows() {
-  if (S.listMode === 'tree') return treeRows();
+  if (S.listMode !== 'list') return treeRows();
   const list = visible();
   if (flatMemo.list !== list) flatMemo = { list, rows: list.map(f => ({ f, depth: -1 })) };
   return flatMemo.rows;
 }
-function toggleDir(path) {
-  S.collapsed.has(path) ? S.collapsed.delete(path) : S.collapsed.add(path);
+function subdirs(path) {
+  const found = new Set();
+  for (const f of visible()) {
+    if (!f.path.startsWith(path + '/')) continue;
+    let p = path;
+    for (const part of f.path.slice(path.length + 1).split('/').slice(0, -1)) found.add(p += '/' + part);
+  }
+  return found;
+}
+function toggleDir(path, isDeep) {
+  const isOpening = S.collapsed.has(path);
+  for (const p of isDeep ? [path, ...subdirs(path)] : [path]) isOpening ? S.collapsed.delete(p) : S.collapsed.add(p);
   S.collapsedVer++;
   store.set('collapsed', JSON.stringify([...S.collapsed]));
   renderFileList();
@@ -1525,7 +1540,7 @@ document.addEventListener('click', e => {
   const ffc = t.closest('[data-act="file-comment"]');
   if (ffc) { revealFile(ffc.dataset.path, openFileComposer); return; }
   const dirRow = t.closest('.it[data-dir]');
-  if (dirRow) { toggleDir(dirRow.dataset.dir); return; }
+  if (dirRow) { if (!dirRow.classList.contains('leaf')) toggleDir(dirRow.dataset.dir, e.altKey); return; }
   if (e.target === $('scrim')) { closeEditor(); return; }
   if (t.closest('#commitHead')) { $('commitSect').classList.toggle('closed'); store.set('commitsClosed', $('commitSect').classList.contains('closed') ? '1' : '0'); return; }
   const tab = t.closest('.tab');
@@ -1754,7 +1769,7 @@ $('resizer').addEventListener('dblclick', () => { setSideWidth(SIDE_W); store.se
 $('vresizer').addEventListener('dblclick', () => { $('commitSect').style.height = ''; store.set('commitsHeight', null); });
 
 $('sideBtn').innerHTML = I.side;
-$('listSeg').innerHTML = `<button data-list="list" title="Flat list">${I.list}</button><button data-list="tree" title="Folder tree">${I.tree}</button>`;
+$('listSeg').innerHTML = `<button data-list="list" title="Flat list">${I.list}</button><button data-list="tree" title="Folder tree">${I.tree}</button><button data-list="dirs" title="Folders only">${I.folder}</button>`;
 $('searchIcon').innerHTML = I.search;
 $('commitChev').innerHTML = I.chev;
 if (store.get('commitsClosed') === '1') $('commitSect').classList.add('closed');
