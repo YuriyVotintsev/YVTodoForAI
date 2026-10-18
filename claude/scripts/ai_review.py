@@ -190,10 +190,10 @@ def cmd_watch(path, fresh):
         time.sleep(0.7)
 
 
-def cmd_open(path):
+def cmd_open(path, session=None):
     found = False
     for c in read(path)["comments"]:
-        if needs_attention(c):
+        if needs_attention(c) and (session is None or c.get("sessionId") == session):
             found = True
             msgs = thread(c)
             tail = " | последнее от пользователя: %s" % short(msgs[-1].get("text")) if msgs and msgs[-1].get("author") == "user" else ""
@@ -242,7 +242,8 @@ def main():
     sub = parser.add_subparsers(dest="cmd", required=True)
     w = sub.add_parser("watch")
     w.add_argument("--fresh", action="store_true")
-    sub.add_parser("open")
+    o = sub.add_parser("open")
+    o.add_argument("--session", help="only comments bound to this Claude Code session")
     s = sub.add_parser("show")
     s.add_argument("id")
     st = sub.add_parser("status")
@@ -255,7 +256,7 @@ def main():
     if args.cmd == "watch":
         cmd_watch(args.file, args.fresh)
     elif args.cmd == "open":
-        cmd_open(args.file)
+        cmd_open(args.file, args.session)
     elif args.cmd == "show":
         cmd_show(args.file, args.id)
     elif args.cmd == "status":

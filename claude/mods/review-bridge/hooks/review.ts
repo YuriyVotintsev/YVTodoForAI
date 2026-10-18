@@ -10,6 +10,7 @@ export type Comment = {
   comment?: string
   status?: string
   kind?: string
+  sessionId?: string | null
   thread?: ThreadMessage[]
   questions?: Question[]
 }
@@ -19,11 +20,13 @@ export type Fingerprint = {
   users: number
   answers: (string | null)[]
   range: [string | null, number | null, number | null]
+  session?: string | null
 }
 export type State = Record<string, Fingerprint>
 
 const status = (c: Comment) => c.status ?? 'PENDING'
 export const isOpen = (c: Comment) => OPEN.includes(status(c))
+export const isMine = (c: Comment, session: string) => c.sessionId === session
 
 export function parseComments(text: string): Comment[] | undefined {
   const body = text.replace(/^﻿/, '')
@@ -49,6 +52,7 @@ export async function fingerprint(c: Comment): Promise<Fingerprint> {
     users: (c.thread ?? []).filter(m => m.author === 'user').length,
     answers: (c.questions ?? []).map(q => q.answer ?? null),
     range: [c.filePath ?? null, c.startLine ?? null, c.endLine ?? null],
+    session: c.sessionId ?? null,
   }
 }
 
@@ -65,54 +69,67 @@ export function short(text: string | undefined, n = 90): string {
 }
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b)
+const CLIP = 2000
 
-export function events(prev: Fingerprint | undefined, cur: Fingerprint, c: Comment): string[] {
-  const head = `${(c.id ?? '?').slice(0, 8)} ${location(c)}`
+export function full(text: string | undefined): string {
+  const trimmed = (text ?? '').trim()
+  return trimmed.length <= CLIP ? trimmed : trimmed.slice(0, CLIP - 1) + '…'
+}
+
+function block(c: Comment, note: string, body = ''): string {
+  const head = [(c.id ?? '?').slice(0, 8), location(c), note].filter(Boolean).join(' · ')
+  return body ? `${head}\n${body}` : head
+}
+
+export function events(prev: Fingerprint | undefined, cur: Fingerprint, c: Comment, session: string): string[] {
+  if (!isMine(c, session)) return []
   const open = OPEN.includes(cur.status)
-  if (!prev) return open ? [`NEW ${head} — ${short(c.comment)}`] : []
+  if (!prev) return open ? [block(c, '', full(c.comment))] : []
+  if (prev.session !== undefined && prev.session !== session) return open ? [block(c, 'перенесён в эту сессию', full(c.comment))] : []
   const out: string[] = []
   if (cur.users > prev.users) {
     const last = (c.thread ?? []).filter(m => m.author === 'user').at(-1)
-    out.push(`REPLY ${head} — ${short(last?.text)}`)
+    out.push(block(c, `ответ к «${short(c.comment, 60)}»`, full(last?.text)))
   }
-  if (!same(cur.answers, prev.answers) && cur.answers.some(a => a != null && a !== '')) out.push(`ANSWER ${head}`)
-  if (cur.text !== prev.text && open) out.push(`EDIT ${head} — ${short(c.comment)}`)
-  if (!same(cur.range, prev.range) && open) out.push(`MOVED ${head}`)
+  if (!same(cur.answers, prev.answers) && cur.answers.some(a => a != null && a !== '')) {
+    const answered = (c.questions ?? []).filter(q => q.answer != null && q.answer !== '')
+    out.push(block(c, 'ответы на вопросы', answered.map(q => `${short(q.question, 120)} → ${q.answer}`).join('\n')))
+  }
+  if (cur.text !== prev.text && open) out.push(block(c, 'текст изменён', full(c.comment)))
+  if (!same(cur.range, prev.range) && open) out.push(block(c, 'переехал'))
   if (cur.status === 'PENDING' && ['DONE', 'CANCELED', 'CLOSED'].includes(prev.status) && cur.users === prev.users) {
-    out.push(`REOPEN ${head} — ${short(c.comment)}`)
+    out.push(block(c, 'снова открыт', full(c.comment)))
   }
   return out
 }
 
-export async function scan(prev: State, comments: Comment[]): Promise<{ events: string[]; state: State }> {
+export async function scan(prev: State, comments: Comment[], session: string): Promise<{ events: string[]; state: State }> {
   const state: State = {}
   const found: string[] = []
   for (const c of comments) {
     if (!c.id) continue
     const cur = await fingerprint(c)
-    found.push(...events(prev[c.id], cur, c))
+    found.push(...events(prev[c.id], cur, c, session))
     state[c.id] = cur
   }
   return { events: found, state }
 }
 
-export function promptText(lines: string[]): string {
+export function promptText(blocks: string[]): string {
   return [
-    'Новые события в review-комментариях (`.ai-review-comments.json`), их заметил мод review-bridge:',
-    ...lines.map(line => `- ${line}`),
-    '',
-    'Обработай их по разделу «Реакция на события» из `~/.claude/commands/review_live.md`: `show <id>`, ' +
-      '`status <id> IN_PROGRESS`, затем ответ или работа и `say <id> DONE|HAS_QUESTIONS` через ' +
-      '`python ~/.claude/scripts/ai_review.py`. Сторож через Monitor не запускай: за файлом следит мод.',
-  ].join('\n')
+    ...blocks,
+    'Это из панели ревью. Возьми (`status` IN_PROGRESS), сделай или ответь и напиши итог в переписку комментария ' +
+      '(`reply`, статус DONE или HAS_QUESTIONS) инструментами review-bridge; порядок — «Реакция на события» ' +
+      'в `~/.claude/commands/review_live.md`.',
+  ].join('\n\n')
 }
 
-export function statusText(comments: Comment[], enabled: boolean): string | undefined {
+export function statusText(comments: Comment[], enabled: boolean, hasFile = true): string | undefined {
   const open = comments.filter(isOpen)
   const questions = open.filter(c => status(c) === 'HAS_QUESTIONS').length
   const working = open.filter(c => status(c) === 'IN_PROGRESS').length
-  if (!open.length) return enabled ? undefined : 'Review: auto off'
-  const parts = [`Review: ${open.length} open`]
+  if (!open.length && !hasFile && enabled) return undefined
+  const parts = [open.length ? `Review: ${open.length} open` : 'Review']
   if (working) parts.push(`${working} in progress`)
   if (questions) parts.push(`${questions} ${questions === 1 ? 'question' : 'questions'}`)
   if (!enabled) parts.push('auto off')

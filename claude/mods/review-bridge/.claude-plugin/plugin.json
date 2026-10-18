@@ -1,5 +1,6 @@
 {
   "name": "review-bridge",
-  "version": "0.1.0",
-  "description": "Watches .ai-review-comments.json and hands new review comments to Claude in the current session"
+  "version": "0.2.0",
+  "description": "Watches .ai-review-comments.json and hands new review comments to Claude in the current session",
+  "types": "./types/index.d.ts"
 }

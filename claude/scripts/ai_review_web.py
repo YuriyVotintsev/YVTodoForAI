@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import re
+import select
 import subprocess
 import sys
 import threading
@@ -286,6 +287,27 @@ def save_presets(body):
     return {"presets": presets}
 
 
+class Presence:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.count = 0
+        self.since = time.monotonic()
+
+    def enter(self):
+        with self.lock:
+            self.count += 1
+
+    def leave(self):
+        with self.lock:
+            self.count -= 1
+            if self.count == 0:
+                self.since = time.monotonic()
+
+    def idle_for(self):
+        with self.lock:
+            return 0 if self.count else time.monotonic() - self.since
+
+
 class Store:
     def __init__(self, path):
         self.path = path
@@ -341,6 +363,24 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, obj, code=200):
         self.send(code, json.dumps(obj, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
 
+    def hold_presence(self, presence):
+        self.send_response(200)
+        self.send_header("Content-Type", "text/event-stream")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        presence.enter()
+        try:
+            self.wfile.write(b"retry: 1000\n\n")
+            while True:
+                readable, _, _ = select.select([self.connection], [], [], 15)
+                if readable and not self.connection.recv(1):
+                    break
+                self.wfile.write(b": ping\n\n")
+        except OSError:
+            pass
+        finally:
+            presence.leave()
+
     def body(self):
         length = int(self.headers.get("Content-Length") or 0)
         return json.loads(self.rfile.read(length).decode("utf-8") or "{}")
@@ -367,8 +407,10 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"sig": data["sig"], "unchanged": True} if arg("sig") == data["sig"] else data)
         elif method == "GET" and path == "/api/file":
             self.send_json(app.git.file(arg("scope", "all"), arg("path"), arg("context", "3"), arg("ws") == "1"))
+        elif method == "GET" and path == "/api/presence":
+            self.hold_presence(app.presence)
         elif method == "GET" and path == "/api/info":
-            self.send_json({"project": app.git.project, "base": app.git.base_ref})
+            self.send_json({"project": app.git.project, "base": app.git.base_ref, "session": app.session})
         elif method == "GET" and path == "/api/presets":
             self.send_json(load_presets())
         elif method == "POST" and path == "/api/presets":
@@ -399,9 +441,11 @@ class Handler(BaseHTTPRequestHandler):
 
 
 class App:
-    def __init__(self, git, store):
+    def __init__(self, git, store, session=None):
         self.git = git
         self.store = store
+        self.session = session
+        self.presence = Presence()
 
     def add(self, body):
         c = {"id": str(uuid.uuid4())}
@@ -415,6 +459,8 @@ class App:
                 c[key] = body[key]
         c["status"] = "PENDING"
         c["createdAt"] = now_ms()
+        if self.session:
+            c["sessionId"] = self.session
         self.store.mutate(lambda data: data["comments"].append(c))
         return c
 
@@ -447,6 +493,10 @@ class App:
                     thread[index]["editedAt"] = now_ms()
                 else:
                     del thread[index]
+            elif action == "adopt":
+                if not self.session:
+                    raise ValueError("This panel is not bound to a session")
+                c["sessionId"] = self.session
             elif action == "answer":
                 questions = c.get("questions") or []
                 index = int(body.get("index", -1))
@@ -474,13 +524,25 @@ def main():
     parser.add_argument("--port", type=int, default=7790)
     parser.add_argument("--base", help="base branch (default: main/master)")
     parser.add_argument("--file", default=".ai-review-comments.json")
+    parser.add_argument("--session", help="Claude Code session id: new comments are bound to it")
+    parser.add_argument("--exit-when-idle", type=float, default=0, metavar="SECONDS",
+                        help="stop once no panel page has been open for this long (0: never)")
     args = parser.parse_args()
     project = os.path.abspath(args.project)
     git = Git(project, args.base)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    server.app = App(git, Store(os.path.join(project, args.file)))
+    server.app = App(git, Store(os.path.join(project, args.file)), args.session)
+    if args.exit_when_idle > 0:
+        threading.Thread(target=exit_when_idle, args=(server, args.exit_when_idle), daemon=True).start()
     print("AI review web: http://127.0.0.1:%d  project=%s  base=%s" % (args.port, project, git.base_ref), flush=True)
     server.serve_forever()
+
+
+def exit_when_idle(server, seconds):
+    while server.app.presence.idle_for() < seconds:
+        time.sleep(1)
+    print("AI review web stopped: no panel open for %g s" % seconds, flush=True)
+    server.shutdown()
 
 
 if __name__ == "__main__":

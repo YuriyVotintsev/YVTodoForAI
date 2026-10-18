@@ -128,7 +128,7 @@ svg { flex: none; }
 .it.dir.hc .fi { color: var(--accent); }
 .dcnt { color: var(--faint); font-size: 12px; font-variant-numeric: tabular-nums; }
 .it .dcb { width: 24px; height: 24px; margin-left: auto; opacity: 0; }
-.it.dir:hover .dcb { opacity: 1; }
+.it:hover .dcb { opacity: 1; }
 .pop { position: fixed; z-index: 25; }
 .fpath { font-family: var(--mono); font-size: 12px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; min-width: 0; flex: 1; text-align: left; }
 .cl-card { padding: 0 2px 8px; }
@@ -146,9 +146,6 @@ svg { flex: none; }
 .fb.nowrap .row:not(.sp), .fb.nowrap .row.sp, .fb.nowrap .hh { width: max-content; min-width: 100%; }
 .fb.nowrap .row.sp { grid-template-columns: minmax(var(--hw), 1fr) minmax(var(--hw), 1fr); }
 .fb.nowrap .slot { position: sticky; left: 0; width: 100%; }
-@media (max-width: 1100px) { .hbtn .hl { display: none; } }
-.hbtn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border-radius: 7px; border: 1px solid var(--border); background: transparent; color: var(--dim); cursor: pointer; font-size: 12.5px; flex: none; }
-.hbtn:hover { color: var(--text); border-color: var(--border-strong); background: var(--raise); }
 .badge { font-size: 11px; padding: 1px 7px; border-radius: 6px; background: var(--raise); color: var(--dim); }
 .nav { display: flex; align-items: center; gap: 2px; color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
 .nav .ib { width: 28px; height: 28px; }
@@ -245,6 +242,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
 .newgen { margin: 2px 2px 8px; border: 1px dashed var(--border-strong); border-radius: 10px; padding: 8px 12px; color: var(--dim); cursor: pointer; display: flex; align-items: center; gap: 8px; background: transparent; width: calc(100% - 4px); text-align: left; }
 .newgen:hover { color: var(--text); border-color: var(--dim); }
 .cfilter { padding: 4px 4px 8px; }
+.sscope { padding: 4px 4px 2px; }
+.sscope .seg { display: inline-flex; }
+.stag { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; background: var(--raise); color: var(--dim); }
 .cl-it { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .cl-it:hover { background: var(--raise); }
 .cl-it .r1 { display: flex; align-items: center; gap: 6px; min-width: 0; }
@@ -254,6 +254,12 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
 .cl-it.na { opacity: .6; }
 .grp { color: var(--dim); font-size: 12px; padding: 10px 10px 4px; }
 .t-k { color: var(--k); } .t-s { color: var(--s); } .t-c { color: var(--c); font-style: italic; } .t-nm { color: var(--nm); } .t-ty { color: var(--ty); } .t-pp { color: var(--pp); }
+.waiting { position: fixed; inset: 46px 0 0 0; z-index: 40; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 80%, transparent); }
+.wbox { display: flex; align-items: center; gap: 12px; background: var(--panel); border: 1px solid var(--border-strong); border-radius: 12px; padding: 14px 18px; box-shadow: var(--shadow); max-width: min(420px, calc(100% - 32px)); }
+.wbox b { font-weight: 500; }
+.wsub { color: var(--dim); font-size: 12.5px; margin-top: 2px; }
+.spin { width: 16px; height: 16px; flex: none; border: 2px solid var(--border-strong); border-top-color: var(--accent); border-radius: 50%; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
 .banner { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--border-strong); box-shadow: var(--shadow); border-radius: 10px; padding: 8px 10px 8px 14px; display: flex; align-items: center; gap: 10px; z-index: 10; }
 .banner button { border: 0; background: var(--accent); color: #fff; border-radius: 7px; padding: 4px 10px; cursor: pointer; }
 .err { color: var(--red); font-size: 12px; padding: 4px 14px 0; }
@@ -337,6 +343,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
     </div>
     <div class="list" id="fileList"></div>
     <div class="list" id="commentList" hidden>
+      <div class="sscope" id="sessionScope" hidden><div class="seg" id="sessionSeg"></div></div>
       <div class="chips cfilter" id="statusChips"></div>
       <div id="genSlot"></div>
       <div id="commentItems"></div>
@@ -348,7 +355,10 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
     </div>
   </aside>
   <div class="resizer" id="resizer" title="Drag to resize · double-click to reset"></div>
-  <div class="diffs" id="diffs"></div>
+  <div class="diffs" id="diffs"><div class="notice">Loading branch changes…</div></div>
+</div>
+<div class="waiting" id="waiting" hidden>
+  <div class="wbox"><span class="spin"></span><div><b>Waiting for the review server…</b><div class="wsub">It starts when the panel is opened. This page reconnects by itself.</div></div></div>
 </div>
 <script>
 const I = {
@@ -366,6 +376,7 @@ const I = {
   search: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>',
   check: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
   undo: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>',
+  take: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',
   trash: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>',
   pencil: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
   x: '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
@@ -397,8 +408,9 @@ const store = {
 };
 const S = {
   scope: 'all', data: null, files: [], content: new Map(), loading: new Map(),
-  comments: [], csig: '', live: false, online: true,
-  presets: [], presetId: store.get('preset'), cur: null, filter: '', tab: 'files', sideOpen: innerWidth > 760,
+  comments: [], allComments: [], csig: '', live: false, online: true,
+  session: null, sessionScope: store.get('sessionScope') === 'all' ? 'all' : 'mine',
+  presets: [], presetId: store.get('preset'), cur: null, filter: '', tab: 'files', sideOpen: true,
   view: store.get('view') === 'split' ? 'split' : 'unified', statusFilter: new Set(JSON.parse(store.get('statusFilter') || '[]')),
   sel: null, drag: false, composer: null, pendingDiff: null, deleteArm: null, editing: null, editingMsg: null, gen: false,
   expanded: new Set(), forceBig: new Set(), editor: null, presetDeleteArm: false,
@@ -580,7 +592,21 @@ function sideOf(c) {
   return null;
 }
 const commentsOf = f => S.comments.filter(c => c.filePath === f.path);
+const isForeign = c => S.session && c.sessionId !== S.session;
+const inScope = c => S.sessionScope === 'all' || !isForeign(c);
+function scopeComments() { S.comments = S.allComments.filter(inScope); }
+async function loadInfo() {
+  try {
+    const j = await api('/api/info');
+    if ((j.session || null) === S.session) return;
+    S.session = j.session || null;
+    scopeComments();
+    refreshComments();
+  } catch {}
+}
 const openCount = list => list.filter(c => OPEN.includes(c.status || 'PENDING')).length;
+
+const sessionTag = c => isForeign(c) ? `<span class="stag" title="${c.sessionId ? `Session ${esc(c.sessionId)}` : 'Written outside a Claude session'}">${c.sessionId ? 'Other session' : 'No session'}</span>` : '';
 
 function cardHtml(c) {
   const st = c.status || 'PENDING';
@@ -592,6 +618,7 @@ function cardHtml(c) {
   if (st === 'DONE') acts.push(`<button class="ib" data-act="close" title="Close (checked)">${I.check}</button>`);
   if (closed || st === 'DONE') acts.push(`<button class="ib" data-act="reopen" title="Reopen">${I.undo}</button>`);
   if (OPEN.includes(st)) acts.push(`<button class="ib" data-act="cancel" title="Cancel">${I.x}</button>`);
+  if (isForeign(c)) acts.unshift(`<button class="ib" data-act="adopt" title="Take into this session: Claude here gets it">${I.take}</button>`);
   acts.push(`<button class="ib${S.deleteArm === c.id ? ' warn' : ''}" data-act="delete" title="${S.deleteArm === c.id ? 'Click again to delete' : 'Delete'}">${I.trash}</button>`);
   const body = editing
     ? `<div class="edit"><textarea data-role="edit" rows="1">${esc(c.comment)}</textarea><button class="send ready" data-act="save" title="Save (Enter)">${I.check}</button></div>`
@@ -611,7 +638,7 @@ function cardHtml(c) {
   const folder = c.kind === 'folder';
   const loc = c.startLine == null ? (folder ? `Folder ${c.filePath}/` : c.filePath ? (S.openCard === c.id ? `${splitPath(c.filePath)[1]} · whole file` : 'Whole file') : 'General') : linesText(c.startLine, c.endLine ?? c.startLine);
   return `<div class="cm${min ? ' min' : ''}" id="c-${esc(c.id)}" data-id="${esc(c.id)}">
-    <div class="cm-h"><span class="pill ${st}">${STATUS[st] || st}</span>${c.filePath && !folder && S.data ? vtag(sideOf(c)) : ''}<span class="loc" title="${esc(c.filePath || '')}">${esc(loc)}</span><span>${c.createdAt ? ago(c.createdAt) : ''}${c.editedAt ? ' · edited' : ''}</span><div class="acts">${acts.join('')}</div></div>
+    <div class="cm-h"><span class="pill ${st}">${STATUS[st] || st}</span>${sessionTag(c)}${c.filePath && !folder && S.data ? vtag(sideOf(c)) : ''}<span class="loc" title="${esc(c.filePath || '')}">${esc(loc)}</span><span>${c.createdAt ? ago(c.createdAt) : ''}${c.editedAt ? ' · edited' : ''}</span><div class="acts">${acts.join('')}</div></div>
     ${body}<div class="cm-x">${qs ? `<div class="qs">${qs}</div>` : ''}${thread}
     <div class="reply"><textarea data-role="reply" rows="1" placeholder="Reply…"></textarea><button class="send" data-act="reply" title="Send (Enter)">${I.up}</button></div></div>
   </div>`;
@@ -663,7 +690,7 @@ function headHtml(f) {
     <button class="ib" data-act="ctx-more" title="More context lines (now ${o.ctx})"${o.full || o.ctx >= CTX_STEPS[CTX_STEPS.length - 1] ? ' disabled' : ''}>${I.more}</button>
     <button class="ib${on(o.full)}" data-act="opt-full" title="Show entire file">${I.full}</button>
     <button class="ib${on(S.view === 'split')}" data-act="opt-split" title="Side-by-side">${I.split}</button></span>`;
-  return `${nav}<span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="pt" title="${esc(f.path)}"><span dir="ltr">${esc(dir)}</span></span>${badge ? `<span class="badge">${badge}</span>` : ''}<span class="spacer"></span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}<span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span><button class="hbtn" data-act="file-comment" title="Comment on the whole file, not on specific lines">${I.bubble}<span class="hl">File comment</span></button>${tb}`;
+  return `${nav}<span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="pt" title="${esc(f.path)}"><span dir="ltr">${esc(dir)}</span></span>${badge ? `<span class="badge">${badge}</span>` : ''}<span class="spacer"></span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}<span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>${tb}`;
 }
 
 const fileBody = () => document.querySelector('#diffs .fb');
@@ -757,7 +784,7 @@ function fileItemHtml(f, depth) {
   const all = commentsOf(f);
   const n = openCount(all);
   const tree = depth >= 0;
-  return `<div class="it${S.cur === f.path ? ' act' : ''}${all.length ? ' hc' : ''}" data-path="${esc(f.path)}" title="${esc(f.path)}"${tree ? ` style="padding-left:${28 + depth * 14}px"` : ''}><span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}${tree ? '' : `<span class="pt"><span dir="ltr">${esc(dir)}</span></span>`}</div>`;
+  return `<div class="it${S.cur === f.path ? ' act' : ''}${all.length ? ' hc' : ''}" data-path="${esc(f.path)}" title="${esc(f.path)}"${tree ? ` style="padding-left:${28 + depth * 14}px"` : ''}><span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}${tree ? '' : `<span class="pt"><span dir="ltr">${esc(dir)}</span></span>`}<button class="ib dcb" data-act="file-comment" data-path="${esc(f.path)}" title="Comment on the whole file">${I.bubble}</button></div>`;
 }
 const dirComments = path => S.comments.filter(c => c.filePath === path);
 function dirItemHtml(row) {
@@ -853,6 +880,12 @@ function renderCommentList() {
       : `<button class="newgen" data-act="gen-open">${I.plus} General comment</button>`;
     if (S.gen) $('genSlot').querySelector('textarea').focus();
   }
+  $('sessionScope').hidden = !S.session;
+  if (S.session) {
+    const mine = S.allComments.filter(c => !isForeign(c)).length;
+    $('sessionSeg').innerHTML = `<button class="${S.sessionScope === 'mine' ? 'on' : ''}" data-sscope="mine" title="Comments written from this Claude session">This session ${mine}</button>` +
+      `<button class="${S.sessionScope === 'all' ? 'on' : ''}" data-sscope="all" title="Every comment of the project, other and closed sessions included">All sessions ${S.allComments.length}</button>`;
+  }
   const counts = {};
   for (const c of S.comments) { const st = c.status || 'PENDING'; counts[st] = (counts[st] || 0) + 1; }
   $('statusChips').innerHTML = `<button class="chip${S.statusFilter.size ? '' : ' on'}" data-status="">All ${S.comments.length}</button>` +
@@ -872,10 +905,11 @@ function renderCommentList() {
       const inDiff = !c.filePath || folder || fileByPath(c.filePath);
       const loc = folder ? `${c.filePath}/` : c.filePath ? `${splitPath(c.filePath)[1]}${c.startLine != null ? ':' + c.startLine + (c.endLine && c.endLine !== c.startLine ? '–' + c.endLine : '') : ''}` : 'General';
       const last = (c.thread || []).filter(m => m.author === 'claude').pop();
-      return `<div class="cl-it${inDiff ? '' : ' na'}" data-cid="${esc(c.id)}" title="${inDiff ? '' : 'Not in this diff'}"><div class="r1"><span class="pill ${c.status || 'PENDING'}">${STATUS[c.status || 'PENDING']}</span>${folder ? `<span class="fi" style="color:var(--dim);display:grid">${I.folder}</span>` : c.filePath && S.data ? vtag(sideOf(c)) : ''}<span class="loc">${esc(loc)}</span></div><div class="tx">${esc(c.comment)}</div>${last ? `<div class="lc">Claude: ${esc(last.text)}</div>` : ''}</div>`;
+      return `<div class="cl-it${inDiff ? '' : ' na'}" data-cid="${esc(c.id)}" title="${inDiff ? '' : 'Not in this diff'}"><div class="r1"><span class="pill ${c.status || 'PENDING'}">${STATUS[c.status || 'PENDING']}</span>${sessionTag(c)}${folder ? `<span class="fi" style="color:var(--dim);display:grid">${I.folder}</span>` : c.filePath && S.data ? vtag(sideOf(c)) : ''}<span class="loc">${esc(loc)}</span></div><div class="tx">${esc(c.comment)}</div>${last ? `<div class="lc">Claude: ${esc(last.text)}</div>` : ''}</div>`;
     }).join('');
   }
-  $('commentItems').innerHTML = html || `<div class="empty">${S.comments.length ? 'No comments with this status.' : 'No comments yet. Hover a line and press + to add one.'}</div>`;
+  const hidden = S.allComments.length - S.comments.length;
+  $('commentItems').innerHTML = html || `<div class="empty">${S.comments.length ? 'No comments with this status.' : hidden ? `No comments from this session yet; ${hidden} in other sessions.` : 'No comments yet. Hover a line and press + to add one.'}</div>`;
 }
 
 function renderScopes() {
@@ -903,13 +937,31 @@ function applyDiff(d, fresh) {
   render(!fresh);
 }
 
+function setOnline(isOnline) {
+  $('waiting').hidden = isOnline;
+  if (S.online === isOnline) return;
+  S.online = isOnline;
+  renderTop();
+  if (isOnline) loadInfo();
+  if (isOnline && !S.data) loadDiff(true);
+}
+
 async function loadDiff(fresh) {
+  if (S.isLoadingDiff) return;
+  S.isLoadingDiff = true;
   try {
     const d = await api(`/api/diff?scope=${enc(S.scope)}`);
-    S.online = true;
+    setOnline(true);
     applyDiff(d, fresh);
   } catch (e) {
-    $('diffs').innerHTML = `<div class="notice">Cannot load diff: ${esc(e.message)}</div>`;
+    if (e instanceof TypeError) {
+      setOnline(false);
+      setTimeout(() => loadDiff(fresh), 1000);
+    } else {
+      $('diffs').innerHTML = `<div class="notice">Cannot load diff: ${esc(e.message)}</div>`;
+    }
+  } finally {
+    S.isLoadingDiff = false;
   }
 }
 
@@ -935,20 +987,21 @@ async function pollDiff() {
 async function pollComments() {
   try {
     const j = await api('/api/comments');
-    const changedLive = j.live !== S.live || !S.online;
-    S.online = true;
+    const changedLive = j.live !== S.live;
+    setOnline(true);
     S.live = j.live;
     const sig = JSON.stringify(j.comments);
     if (sig !== S.csig || S.cdirty) {
       S.csig = sig;
-      S.comments = j.comments;
+      S.allComments = j.comments;
+      scopeComments();
       refreshComments();
     }
     if (changedLive) renderTop();
-  } catch {
-    if (S.online) { S.online = false; renderTop(); }
+  } catch (e) {
+    if (e instanceof TypeError) setOnline(false);
   }
-  setTimeout(pollComments, 1500);
+  setTimeout(pollComments, S.online ? 1500 : 1000);
 }
 
 function refreshComments() {
@@ -1070,7 +1123,7 @@ function openFileComposer() {
   const prev = S.composer;
   S.sel = null;
   paintSel();
-  S.composer = { path: S.cur, text: prev && prev.path === S.cur ? prev.text : '', whole: true };
+  S.composer = { path: S.cur, text: prev && prev.path === S.cur ? prev.text : '', whole: true, wantsFocus: true };
   mountComposer(true);
   $('diffs').scrollTop = 0;
 }
@@ -1098,7 +1151,7 @@ function mountComposer(focus) {
   }
   const ta = body.querySelector('.slot.cmp textarea');
   autosize(ta);
-  if (focus) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  if (focus || c.wantsFocus) { c.wantsFocus = false; ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
 }
 function closeComposer() {
   S.composer = null;
@@ -1258,6 +1311,7 @@ async function onCardAction(card, action, el) {
   if (action === 'cancel') return act(id, { action: 'status', status: 'CANCELED' });
   if (action === 'reopen') { S.expanded.delete(id); return act(id, { action: 'status', status: 'PENDING' }); }
   if (action === 'answer') return act(id, { action: 'answer', index: +el.dataset.q, answer: el.dataset.v });
+  if (action === 'adopt') return act(id, { action: 'adopt' });
   if (action === 'reply') {
     const ta = card.querySelector('textarea[data-role=reply]');
     if (!ta.value.trim()) return;
@@ -1433,7 +1487,7 @@ document.addEventListener('mouseup', () => {
 
 document.addEventListener('click', e => {
   const t = e.target;
-  if (t.closest('#sideBtn')) { S.sideOpen = !S.sideOpen; store.set('sideOpen', S.sideOpen ? '1' : '0'); renderTop(); return; }
+  if (t.closest('#sideBtn')) { S.sideOpen = !S.sideOpen; renderTop(); return; }
   if (t.closest('#presetBtn')) { $('menu') ? closeMenu() : openPresetMenu(); return; }
   const lb = t.closest('#listSeg button');
   if (lb) {
@@ -1445,12 +1499,22 @@ document.addEventListener('click', e => {
   }
   const fc = t.closest('[data-act="folder-comment"]');
   if (fc) { openFolderComposer(fc.dataset.dir); return; }
+  const ffc = t.closest('[data-act="file-comment"]');
+  if (ffc) { revealFile(ffc.dataset.path, openFileComposer); return; }
   const dirRow = t.closest('.it[data-dir]');
   if (dirRow) { toggleDir(dirRow.dataset.dir); return; }
   if (e.target === $('scrim')) { closeEditor(); return; }
   if (t.closest('#commitHead')) { $('commitSect').classList.toggle('closed'); store.set('commitsClosed', $('commitSect').classList.contains('closed') ? '1' : '0'); return; }
   const tab = t.closest('.tab');
   if (tab) { S.tab = tab.dataset.tab; renderSide(); return; }
+  const ss = t.closest('[data-sscope]');
+  if (ss) {
+    S.sessionScope = ss.dataset.sscope;
+    store.set('sessionScope', S.sessionScope);
+    scopeComments();
+    refreshComments();
+    return;
+  }
   const sc = t.closest('[data-status]');
   if (sc) {
     const st = sc.dataset.status;
@@ -1484,7 +1548,6 @@ document.addEventListener('click', e => {
     return;
   }
   if (action === 'submit') { submitComposer(); return; }
-  if (action === 'file-comment') { openFileComposer(); return; }
   if (action === 'folder-send') { submitFolder(); return; }
   if (action === 'opt-ws') { changeOpts(o => { o.ws = !o.ws; }, true); return; }
   if (action === 'opt-inv') { changeOpts(o => { o.inv = !o.inv; }); return; }
@@ -1670,13 +1733,18 @@ $('sideBtn').innerHTML = I.side;
 $('listSeg').innerHTML = `<button data-list="list" title="Flat list">${I.list}</button><button data-list="tree" title="Folder tree">${I.tree}</button>`;
 $('searchIcon').innerHTML = I.search;
 $('commitChev').innerHTML = I.chev;
-if (store.get('sideOpen') === '0') S.sideOpen = false;
 if (store.get('commitsClosed') === '1') $('commitSect').classList.add('closed');
 if (store.get('sideWidth')) setSideWidth(+store.get('sideWidth'));
 if (store.get('commitsHeight')) setCommitsHeight(+store.get('commitsHeight'));
 renderTop();
+loadInfo();
 api('/api/presets').then(j => { S.presets = j.presets; }).catch(() => { S.presets = [{ id: 'all', name: 'All files', include: [], exclude: [] }]; })
   .then(() => loadDiff(true)).then(() => { pollComments(); pollDiff(); });
+function holdPresence() {
+  const source = new EventSource('/api/presence');
+  source.onerror = () => { if (source.readyState === EventSource.CLOSED) setTimeout(holdPresence, 1000); };
+}
+holdPresence();
 setInterval(() => { if (!busy()) refreshComments(); }, 60000);
 </script>
 </body>

@@ -1,4 +1,4 @@
-import { isOpen, parseComments, promptText, scan, statusText } from './review'
+import { isMine, isOpen, parseComments, promptText, scan, statusText } from './review'
 import type { Comment, State } from './review'
 
 export type Timer = { cancel: () => void }
@@ -10,6 +10,7 @@ export type BridgeIO = {
   after: (ms: number, fn: () => void) => Timer
   submit: (text: string) => Promise<unknown>
   status: (text: string | undefined) => void
+  session: () => Promise<string>
 }
 
 export const FILE = '.ai-review-comments.json'
@@ -17,7 +18,7 @@ export const QUIET_MS = 2500
 export const MAX_WAIT_MS = 10000
 export const BEAT_MS = 5000
 export const LIVE_FRESH_MS = 60000
-const MAX_LINES = 40
+const MAX_EVENTS = 20
 
 type LiveFile = { heartbeat?: number; comments?: State }
 
@@ -33,8 +34,10 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
   let firstAt = 0
   let timer: Timer | undefined
   let lastBeat = 0
+  let session = ''
 
-  const showStatus = () => io.status(statusText(comments, enabled))
+  const mine = () => comments.filter(c => isMine(c, session))
+  const showStatus = () => io.status(statusText(mine(), enabled, mtime != null))
 
   async function load(): Promise<Comment[] | undefined> {
     try {
@@ -58,12 +61,12 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
   async function flush() {
     timer?.cancel()
     timer = undefined
-    const lines = pending.splice(0)
+    const blocks = pending.splice(0)
     firstAt = 0
-    if (!lines.length || !enabled) return
-    const shown = lines.length > MAX_LINES
-      ? [...lines.slice(0, MAX_LINES), `… и ещё ${lines.length - MAX_LINES}, полный список: \`ai_review.py open\``]
-      : lines
+    if (!blocks.length || !enabled) return
+    const shown = blocks.length > MAX_EVENTS
+      ? [...blocks.slice(0, MAX_EVENTS), `… и ещё ${blocks.length - MAX_EVENTS}, полный список — инструмент \`open\``]
+      : blocks
     await io.submit(promptText(shown))
   }
 
@@ -84,6 +87,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
   }
 
   async function start() {
+    session = await io.session()
     const current = await io.stat(file)
     if (current === undefined) {
       mtime = undefined
@@ -98,7 +102,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
     const now = await io.now()
     const isFresh = saved?.comments !== undefined && typeof saved.heartbeat === 'number'
       && now - saved.heartbeat < LIVE_FRESH_MS
-    const result = await scan(isFresh ? saved.comments ?? {} : {}, list)
+    const result = await scan(isFresh ? saved.comments ?? {} : {}, list, session)
     state = result.state
     if (isFresh) await queue(result.events)
     showStatus()
@@ -109,23 +113,24 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
     busy = true
     try {
       const current = await io.stat(file)
-      if (current !== mtime) {
+      const id = await io.session()
+      if (current !== mtime || id !== session) {
+        session = id
         const list = current === undefined ? [] : await load()
         if (list) {
           mtime = current
-          const result = await scan(state, list)
+          const result = await scan(state, list, session)
           state = result.state
           comments = list
           await queue(result.events)
           showStatus()
         }
       }
-      if (current !== undefined && enabled) {
-        const now = await io.now()
-        if (now - lastBeat >= BEAT_MS) {
-          lastBeat = now
-          await writeLive(now)
-        }
+      const now = await io.now()
+      if (now - lastBeat >= BEAT_MS) {
+        lastBeat = now
+        showStatus()
+        if (current !== undefined && enabled) await writeLive(now)
       }
     } finally {
       busy = false
@@ -158,6 +163,6 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
     setEnabled,
     stop,
     isEnabled: () => enabled,
-    openCount: () => comments.filter(isOpen).length,
+    openCount: () => mine().filter(isOpen).length,
   }
 }

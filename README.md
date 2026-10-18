@@ -36,17 +36,33 @@ Comments are stored in `.ai-review-comments.json` in the project root (the plugi
   toggles), editable presets of what to show (code only, all files), a flat list or a folder tree, comments on lines
   of the old or the new version, on a whole file, on a folder or general, and threads with Claude's replies. Comments
   go to the same `.ai-review-comments.json`.
-- `skills/review-panel/SKILL.md` – `/review-panel`: starts the server through the project's `.claude/launch.json`
-  (created and excluded from git on the first run) and opens the panel.
-- `mods/review-bridge/` – a Claude Code mod: watches `.ai-review-comments.json` and hands every new comment, reply,
-  edit or answer to Claude in the running session within seconds (no watcher to restart), lights "Claude live" in the
-  panel and counts open comments in the status line. `/review-auto on|off` switches it per project;
-  `claude plugin test claude/mods/review-bridge` runs its tests.
+- `mods/review-bridge/` – a Claude Code mod:
+  - watches `.ai-review-comments.json` and hands every new comment, reply, edit or answer to Claude in the running
+    session within seconds (no watcher to restart) and lights "Claude live" in the panel; the prompt is the comment
+    itself (place and text), sent as the person's words;
+  - binds comments to sessions: the panel a session opens runs its own server with `--session <id>`, which stamps
+    `sessionId` on every comment written there, and the mod hands a comment only to its own session. The panel's
+    Comments tab shows "This session" or "All sessions"; a comment of another session, or one written outside a
+    session (Rider, older files), carries a tag there and can be taken into this session with one click. Unbound
+    comments are never handed over by themselves;
+  - gives Claude the tools `open`, `show`, `status` and `reply` (`mcp__review-bridge__*`, listed up front) so it
+    answers in the thread without running `ai_review.py` through Bash; they call that same helper, so the file keeps
+    one writer;
+  - shows a "Review" button in the prompt footer that opens the panel, with this session's open comments on it
+    ("Review: 2 open · 1 question"); it stays while the project has a review file, even with nothing open;
+  - `/review-panel [--base <branch>]` opens the panel without a model turn: picks a free port (7790–7799), starts the
+    server itself with `--exit-when-idle 60` (an open panel page holds an event stream to it, so the server stops a
+    minute after the last panel closes and the next open starts it again in a fraction of a second),
+    writes an attach-only `code-review` configuration (`url`, no command) to the project's `.claude/launch.json`,
+    excludes that file from git and shows the page in the built-in browser. A panel left open waits for its server and
+    reconnects by itself. The mod lets its own `preview_start` call for `code-review` through a permission ask (auto
+    mode cannot classify a call no prompt asked for), so no settings rule is needed; a deny rule still wins;
+  - `/review-auto on|off` switches the hand-over per project;
+  - `claude plugin test claude/mods/review-bridge` runs its tests.
 
 Install:
 
-- copy `claude/commands/*.md` to `~/.claude/commands/`, `claude/scripts/*` to `~/.claude/scripts/` and
-  `claude/skills/review-panel/` to `~/.claude/skills/review-panel/`;
+- copy `claude/commands/*.md` to `~/.claude/commands/` and `claude/scripts/*` to `~/.claude/scripts/`;
 - load the mod straight from the repository: add its folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of
   `~/.claude/settings.json`, e.g. `"CLAUDE_CODE_PLUGIN_DIRS": "D:/Projects/rider-comments-plugin/claude/mods/review-bridge"`
   (several folders are separated by `;` on Windows, `:` elsewhere). New sessions load it, and an interactive session
