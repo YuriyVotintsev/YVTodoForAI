@@ -27,11 +27,33 @@ Comments are stored in `.ai-review-comments.json` in the project root (the plugi
 
 - `commands/review_comments.md` – `/review_comments`: process all comments at once (questions first, then the work).
 - `commands/review_live.md` – `/review_live`: a watcher stays open and Claude reacts to every new comment or reply
-  as it appears.
+  as it appears. Not needed while the `review-bridge` mod is loaded; its "Реакция на события" rules are what the mod
+  points Claude to.
 - `scripts/ai_review.py` – the helper both commands use (`open`, `show`, `status`, `say`, `watch`).
+- `scripts/ai_review_web.py` + `scripts/ai_review_web.html` – the review panel for the Claude Desktop app: a local
+  server (127.0.0.1, Python standard library only) and a page opened in the app's built-in browser. The branch diff one
+  file at a time (unified or split, more or fewer context lines, the whole file, whitespace and invisible-symbol
+  toggles), editable presets of what to show (code only, all files), a flat list or a folder tree, comments on lines
+  of the old or the new version, on a whole file, on a folder or general, and threads with Claude's replies. Comments
+  go to the same `.ai-review-comments.json`.
+- `skills/review-panel/SKILL.md` – `/review-panel`: starts the server through the project's `.claude/launch.json`
+  (created and excluded from git on the first run) and opens the panel.
+- `mods/review-bridge/` – a Claude Code mod: watches `.ai-review-comments.json` and hands every new comment, reply,
+  edit or answer to Claude in the running session within seconds (no watcher to restart), lights "Claude live" in the
+  panel and counts open comments in the status line. `/review-auto on|off` switches it per project;
+  `claude plugin test claude/mods/review-bridge` runs its tests.
 
-Install: copy `claude/commands/*.md` to `~/.claude/commands/` and `claude/scripts/ai_review.py` to
-`~/.claude/scripts/`. The plugin never starts Claude itself; the commands are run by hand in a Claude Code session.
+Install:
+
+- copy `claude/commands/*.md` to `~/.claude/commands/`, `claude/scripts/*` to `~/.claude/scripts/` and
+  `claude/skills/review-panel/` to `~/.claude/skills/review-panel/`;
+- load the mod straight from the repository: add its folder to `CLAUDE_CODE_PLUGIN_DIRS` in the `env` block of
+  `~/.claude/settings.json`, e.g. `"CLAUDE_CODE_PLUGIN_DIRS": "D:/Projects/rider-comments-plugin/claude/mods/review-bridge"`
+  (several folders are separated by `;` on Windows, `:` elsewhere). New sessions load it, and an interactive session
+  reloads it when its files change.
+
+The Rider plugin never starts Claude itself: comments are handed over by the mod, or by the commands run by hand in a
+Claude Code session.
 
 ## Build
 
@@ -46,4 +68,5 @@ the zip from `build/distributions` via Settings → Plugins → ⚙ → Install 
 
 - JetBrains Rider 2025.3+
 - git in PATH
-- Python 3 for `claude/scripts/ai_review.py`
+- Python 3 for `claude/scripts/ai_review.py` and `claude/scripts/ai_review_web.py`
+- Claude Code Desktop for the review panel; a Claude Code build with mods (function-hook plugins) for `review-bridge`
