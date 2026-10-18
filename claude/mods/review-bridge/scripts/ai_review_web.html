@@ -417,7 +417,7 @@ const store = {
   set(k, v) { try { v == null ? localStorage.removeItem(k) : localStorage.setItem(k, v); } catch {} },
 };
 const S = {
-  scope: 'all', data: null, files: [], content: new Map(), loading: new Map(),
+  scope: 'all', data: null, files: [], raw: new Map(), content: new Map(), loading: new Map(),
   comments: [], allComments: [], csig: '', live: false, online: true,
   session: null, sessionScope: store.get('sessionScope') === 'all' ? 'all' : 'mine', liveSessions: [],
   presets: [], presetId: store.get('preset'), cur: null, filter: '', tab: 'files', sideOpen: true,
@@ -558,8 +558,52 @@ function langOf(p) {
 }
 
 const ctxParam = () => S.opts.full ? 'full' : String(S.opts.ctx);
-const contentKey = f => `${S.scope}|${S.data.oldRev}|${f.path}|${f.status}|${f.additions}|${f.deletions}|${f.v || ''}|${ctxParam()}|${S.opts.ws ? 1 : 0}`;
-const contentOf = f => f && S.data ? S.content.get(contentKey(f)) : null;
+const rawKey = f => `${S.scope}|${S.data.oldRev}|${f.path}|${f.status}|${f.additions}|${f.deletions}|${f.v || ''}|${S.opts.ws ? 1 : 0}`;
+const contentKey = f => `${rawKey(f)}|${ctxParam()}`;
+function contentOf(f) {
+  if (!f || !S.data) return null;
+  const k = contentKey(f);
+  if (!S.content.has(k)) {
+    const raw = S.raw.get(rawKey(f));
+    if (!raw) return null;
+    if (S.content.size > 80) S.content.clear();
+    S.content.set(k, prepareContent(withContext(raw, ctxParam())));
+  }
+  return S.content.get(k);
+}
+const FUNC_BYTES = 80;
+const isFuncLine = r => r.o != null && /^[A-Za-z_$]/.test(r.s);
+const funcText = s => new TextDecoder().decode(new TextEncoder().encode(s).slice(0, FUNC_BYTES)).replace(/\s+$/, '');
+const range = (start, count) => count === 1 ? `${start}` : `${start},${count}`;
+function withContext(raw, ctx) {
+  const copy = lines => lines.map(r => ({ ...r }));
+  if (ctx === 'full' || raw.binary) return { ...raw, hunks: raw.hunks.map(h => ({ ...h, lines: copy(h.lines) })) };
+  const n = +ctx;
+  const lines = copy(raw.hunks.flatMap(h => h.lines));
+  const near = new Array(lines.length);
+  for (let i = 0, d = Infinity; i < lines.length; i++) near[i] = d = lines[i].t === ' ' ? d + 1 : 0;
+  for (let i = lines.length - 1, d = Infinity; i >= 0; i--) near[i] = Math.min(near[i], d = lines[i].t === ' ' ? d + 1 : 0);
+  const hunks = [];
+  let cur = null, oLast = 0, nLast = 0, func = '';
+  lines.forEach((r, i) => {
+    if (near[i] > n) cur = null;
+    else {
+      if (!cur) hunks.push(cur = { o0: oLast, n0: nLast, section: func ? funcText(func) : '', lines: [] });
+      cur.lines.push(r);
+    }
+    if (r.o != null) oLast = r.o;
+    if (r.n != null) nLast = r.n;
+    if (isFuncLine(r)) func = r.s;
+  });
+  return {
+    ...raw,
+    hunks: hunks.map(h => {
+      const olds = h.lines.filter(r => r.o != null), news = h.lines.filter(r => r.n != null);
+      const header = `@@ -${range(olds.length ? olds[0].o : h.o0, olds.length)} +${range(news.length ? news[0].n : h.n0, news.length)} @@`;
+      return { header, section: h.section, lines: h.lines };
+    }),
+  };
+}
 function prepareContent(c) {
   c.rows = [];
   for (const h of c.hunks) for (const r of h.lines) { r.i = c.rows.length; c.rows.push(r); }
@@ -582,13 +626,14 @@ function prepareContent(c) {
   return c;
 }
 function loadContent(f) {
-  const k = contentKey(f);
-  if (S.content.has(k)) return Promise.resolve(S.content.get(k));
+  const ready = contentOf(f);
+  if (ready) return Promise.resolve(ready);
+  const k = rawKey(f);
   if (S.loading.has(k)) return S.loading.get(k);
-  const p = api(`/api/file?scope=${enc(S.scope)}&path=${enc(f.path)}&context=${ctxParam()}&ws=${S.opts.ws ? 1 : 0}`).then(c => {
-    if (S.content.size > 80) S.content.clear();
-    S.content.set(k, prepareContent(c));
-    return c;
+  const p = api(`/api/file?scope=${enc(S.scope)}&path=${enc(f.path)}&context=full&ws=${S.opts.ws ? 1 : 0}`).then(raw => {
+    if (S.raw.size > 40) S.raw.clear();
+    S.raw.set(k, raw);
+    return contentOf(f);
   }).finally(() => S.loading.delete(k));
   S.loading.set(k, p);
   return p;
@@ -728,10 +773,15 @@ function renderDiffs(keepScroll) {
   if (!S.files.length) { el.innerHTML = `<div class="notice">No changes in this scope.</div>`; return; }
   if (!f) { el.innerHTML = `<div class="notice">${S.filter ? 'No files match the filter.' : `No changed files match the “${esc(preset()?.name)}” preset.`}</div>`; return; }
   const c = contentOf(f);
-  const nowrap = !S.opts.wrap && c && c.rows.length;
-  const style = nowrap ? ` style="--cw: calc(${c.maxLen + 1}ch + 22px); --hw: calc(${c.maxLen + 1}ch + 116px)"` : '';
-  el.innerHTML = `<section class="file" data-path="${esc(f.path)}"><div class="fh">${headHtml(f)}</div><div class="fb${nowrap ? ' nowrap' : ''}"${style}>${c ? bodyHtml(f, c) : '<div class="fnote">Loading…</div>'}</div></section>`;
-  el.scrollTop = keepScroll ? top : 0;
+  const shown = el.querySelector(':scope > section.file');
+  if (!c && keepScroll && shown?.dataset.path === f.path && shown.querySelector('.fb .row')) {
+    shown.querySelector('.fh').innerHTML = headHtml(f);
+  } else {
+    const nowrap = !S.opts.wrap && c && c.rows.length;
+    const style = nowrap ? ` style="--cw: calc(${c.maxLen + 1}ch + 22px); --hw: calc(${c.maxLen + 1}ch + 116px)"` : '';
+    el.innerHTML = `<section class="file" data-path="${esc(f.path)}"><div class="fh">${headHtml(f)}</div><div class="fb${nowrap ? ' nowrap' : ''}"${style}>${c ? bodyHtml(f, c) : '<div class="fnote">Loading…</div>'}</div></section>`;
+    el.scrollTop = keepScroll ? top : 0;
+  }
   if (!c) {
     loadContent(f).then(() => { if (S.cur === f.path) renderDiffs(keepScroll); })
       .catch(e => { const b = fileBody(); if (b && S.cur === f.path) b.innerHTML = `<div class="fnote">Cannot load diff: ${esc(e.message)}</div>`; });
