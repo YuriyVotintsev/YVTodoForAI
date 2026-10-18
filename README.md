@@ -44,7 +44,9 @@ Comments are stored in `.ai-review-comments.json` in the project root (the plugi
     `sessionId` on every comment written there, and the mod hands a comment only to its own session. The panel's
     Comments tab shows "This session" or "All sessions"; a comment of another session, or one written outside a
     session (Rider, older files), carries a tag there and can be taken into this session with one click. Unbound
-    comments are never handed over by themselves;
+    comments are never handed over by themselves. Each session keeps its own heartbeat in the `.live` file, so the
+    panel's "Claude live" is about its own session and "Take N lost" takes over every open comment that has no
+    session or whose session is not running;
   - gives Claude the tools `open`, `show`, `status` and `reply` (`mcp__review-bridge__*`, listed up front) so it
     answers in the thread without running `ai_review.py` through Bash; they call that same helper, so the file keeps
     one writer;

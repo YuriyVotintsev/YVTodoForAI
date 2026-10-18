@@ -316,13 +316,16 @@ class Store:
     def live(self):
         try:
             with open(self.path + ".live", encoding="utf-8") as f:
-                beat = json.load(f).get("heartbeat", 0)
+                data = json.load(f)
         except Exception:
-            return False
-        return now_ms() - beat < 15000
+            return False, []
+        fresh = lambda beat: isinstance(beat, (int, float)) and now_ms() - beat < 15000
+        sessions = sorted(s for s, beat in (data.get("sessions") or {}).items() if fresh(beat))
+        return fresh(data.get("heartbeat", 0)), sessions
 
     def snapshot(self):
-        return {"comments": ai_review.read(self.path)["comments"], "live": self.live()}
+        live, sessions = self.live()
+        return {"comments": ai_review.read(self.path)["comments"], "live": live, "liveSessions": sessions}
 
     def mutate(self, change):
         with self.lock:

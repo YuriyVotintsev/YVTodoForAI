@@ -20,7 +20,7 @@ export const BEAT_MS = 5000
 export const LIVE_FRESH_MS = 60000
 const MAX_EVENTS = 20
 
-type LiveFile = { heartbeat?: number; comments?: State }
+type LiveFile = { heartbeat?: number; sessions?: Record<string, unknown>; comments?: State }
 
 export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
   const file = `${root}/${FILE}`
@@ -55,8 +55,15 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
     }
   }
 
-  const writeLive = (heartbeat: number) =>
-    io.write(live, JSON.stringify({ heartbeat, pid: 0, source: 'review-bridge', comments: state }))
+  async function writeLive(now: number, isAlive: boolean) {
+    const sessions: Record<string, number> = {}
+    for (const [id, beat] of Object.entries((await readLive())?.sessions ?? {})) {
+      if (id !== session && typeof beat === 'number' && now - beat < LIVE_FRESH_MS) sessions[id] = beat
+    }
+    if (isAlive && session) sessions[session] = now
+    const heartbeat = Math.max(0, ...Object.values(sessions))
+    await io.write(live, JSON.stringify({ heartbeat, pid: 0, source: 'review-bridge', sessions, comments: state }))
+  }
 
   async function flush() {
     timer?.cancel()
@@ -130,7 +137,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
       if (now - lastBeat >= BEAT_MS) {
         lastBeat = now
         showStatus()
-        if (current !== undefined && enabled) await writeLive(now)
+        if (current !== undefined && enabled) await writeLive(now, true)
       }
     } finally {
       busy = false
@@ -146,7 +153,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
       firstAt = 0
       timer?.cancel()
       timer = undefined
-      if (mtime != null) await writeLive(0)
+      if (mtime != null) await writeLive(await io.now(), false)
     }
     showStatus()
   }
@@ -154,7 +161,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
   async function stop() {
     timer?.cancel()
     timer = undefined
-    if (enabled && mtime != null) await writeLive(0)
+    if (enabled && mtime != null) await writeLive(await io.now(), false)
   }
 
   return {

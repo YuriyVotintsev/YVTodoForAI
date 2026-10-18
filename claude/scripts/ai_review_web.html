@@ -244,7 +244,9 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
 .newgen:hover { color: var(--text); border-color: var(--dim); }
 .cfilter { padding: 4px 4px 8px; }
 .sscope { padding: 4px 4px 2px; }
-.sscope .seg { display: inline-flex; }
+.sscope:not([hidden]) { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.sscope .chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; }
+.sscope .chip svg { width: 13px; height: 13px; }
 .stag { font-size: 11.5px; padding: 1px 8px; border-radius: 999px; white-space: nowrap; background: var(--raise); color: var(--dim); }
 .cl-it { padding: 8px 10px; border-radius: 8px; cursor: pointer; display: flex; flex-direction: column; gap: 3px; }
 .cl-it:hover { background: var(--raise); }
@@ -344,7 +346,7 @@ code { font-family: var(--mono); font-size: .9em; background: var(--raise); padd
     </div>
     <div class="list" id="fileList"></div>
     <div class="list" id="commentList" hidden>
-      <div class="sscope" id="sessionScope" hidden><div class="seg" id="sessionSeg"></div></div>
+      <div class="sscope" id="sessionScope" hidden></div>
       <div class="chips cfilter" id="statusChips"></div>
       <div id="genSlot"></div>
       <div id="commentItems"></div>
@@ -410,7 +412,7 @@ const store = {
 const S = {
   scope: 'all', data: null, files: [], content: new Map(), loading: new Map(),
   comments: [], allComments: [], csig: '', live: false, online: true,
-  session: null, sessionScope: store.get('sessionScope') === 'all' ? 'all' : 'mine',
+  session: null, sessionScope: store.get('sessionScope') === 'all' ? 'all' : 'mine', liveSessions: [],
   presets: [], presetId: store.get('preset'), cur: null, filter: '', tab: 'files', sideOpen: true,
   view: store.get('view') === 'split' ? 'split' : 'unified', statusFilter: new Set(JSON.parse(store.get('statusFilter') || '[]')),
   sel: null, drag: false, composer: null, pendingDiff: null, deleteArm: null, editing: null, editingMsg: null, gen: false,
@@ -607,7 +609,23 @@ async function loadInfo() {
 }
 const openCount = list => list.filter(c => OPEN.includes(c.status || 'PENDING')).length;
 
-const sessionTag = c => isForeign(c) ? `<span class="stag" title="${c.sessionId ? `Session ${esc(c.sessionId)}` : 'Written outside a Claude session'}">${c.sessionId ? 'Other session' : 'No session'}</span>` : '';
+const isRunning = c => !!c.sessionId && S.liveSessions.includes(c.sessionId);
+const isLost = c => isForeign(c) && !isRunning(c) && OPEN.includes(c.status || 'PENDING');
+function sessionTag(c) {
+  if (!isForeign(c)) return '';
+  const [text, title] = !c.sessionId ? ['No session', 'Written outside a Claude session']
+    : isRunning(c) ? ['Other session', `Session ${c.sessionId} is running and handles it`]
+    : ['Offline session', `Session ${c.sessionId} is not running: nobody handles it`];
+  return `<span class="stag" title="${esc(title)}">${text}</span>`;
+}
+async function adoptLost() {
+  try {
+    for (const c of S.allComments.filter(isLost)) Object.assign(c, await post(`/api/comments/${enc(c.id)}`, { action: 'adopt' }));
+  } catch (e) { flashError(e); }
+  S.csig = '';
+  scopeComments();
+  refreshComments();
+}
 
 function cardHtml(c) {
   const st = c.status || 'PENDING';
@@ -884,8 +902,10 @@ function renderCommentList() {
   $('sessionScope').hidden = !S.session;
   if (S.session) {
     const mine = S.allComments.filter(c => !isForeign(c)).length;
-    $('sessionSeg').innerHTML = `<button class="${S.sessionScope === 'mine' ? 'on' : ''}" data-sscope="mine" title="Comments written from this Claude session">This session ${mine}</button>` +
-      `<button class="${S.sessionScope === 'all' ? 'on' : ''}" data-sscope="all" title="Every comment of the project, other and closed sessions included">All sessions ${S.allComments.length}</button>`;
+    const lost = S.allComments.filter(isLost).length;
+    $('sessionScope').innerHTML = `<div class="seg"><button class="${S.sessionScope === 'mine' ? 'on' : ''}" data-sscope="mine" title="Comments written from this Claude session">This session ${mine}</button>` +
+      `<button class="${S.sessionScope === 'all' ? 'on' : ''}" data-sscope="all" title="Every comment of the project, other and closed sessions included">All sessions ${S.allComments.length}</button></div>` +
+      (S.sessionScope === 'all' && lost ? `<button class="chip" data-act="adopt-lost" title="Open comments with no session or from a session that is not running: Claude here gets them">${I.take} Take ${lost} lost</button>` : '');
   }
   const counts = {};
   for (const c of S.comments) { const st = c.status || 'PENDING'; counts[st] = (counts[st] || 0) + 1; }
@@ -988,12 +1008,14 @@ async function pollDiff() {
 async function pollComments() {
   try {
     const j = await api('/api/comments');
-    const changedLive = j.live !== S.live;
+    const live = S.session ? (j.liveSessions || []).includes(S.session) : j.live;
+    const changedLive = live !== S.live;
     setOnline(true);
-    S.live = j.live;
-    const sig = JSON.stringify(j.comments);
+    S.live = live;
+    const sig = JSON.stringify(j.comments) + '|' + (j.liveSessions || []).join(',');
     if (sig !== S.csig || S.cdirty) {
       S.csig = sig;
+      S.liveSessions = j.liveSessions || [];
       S.allComments = j.comments;
       scopeComments();
       refreshComments();
@@ -1559,6 +1581,7 @@ document.addEventListener('click', e => {
   if (action === 'opt-split') { setView(S.view === 'split' ? 'unified' : 'split'); return; }
   if (action === 'apply-diff') { const d = S.pendingDiff; S.pendingDiff = null; hideBanner(); if (d) applyDiff(d, false); return; }
   if (action === 'gen-open') { S.gen = true; renderCommentList(); return; }
+  if (action === 'adopt-lost') { adoptLost(); return; }
   if (action === 'gen-send') { submitGeneral(); return; }
   if (action === 'pick-preset') {
     closeMenu();

@@ -137,6 +137,18 @@ test('off stops prompts and drops the live heartbeat; on resumes without replayi
   expect(s.live().heartbeat).toBeGreaterThan(0)
 })
 
+test('each session keeps its own heartbeat in the live file and takes only it away', async () => {
+  const s = setup([pending('a1')])
+  s.put(LIVE, { heartbeat: 999_000, sessions: { 'session-other': 999_000, 'session-gone': 900_000 }, comments: {} })
+  await s.bridge.start()
+  await s.bridge.tick()
+  expect(s.live().sessions).toEqual({ 'session-other': 999_000, [ME]: 1_000_000 })
+  expect(s.live().heartbeat).toBe(1_000_000)
+  await s.bridge.stop()
+  expect(s.live().sessions).toEqual({ 'session-other': 999_000 })
+  expect(s.live().heartbeat).toBe(999_000)
+})
+
 test('a fresh heartbeat file lets a reloaded mod catch up on what it missed', async () => {
   const s = setup([pending('a1')])
   s.put(LIVE, { heartbeat: 1_000_000 - 5000, comments: {} })
