@@ -283,6 +283,7 @@ def save_presets(body):
                for p in body.get("presets") or []]
     if not presets:
         raise ValueError("At least one preset is required")
+    os.makedirs(os.path.dirname(PRESETS), exist_ok=True)
     ai_review.write(PRESETS, {"presets": presets})
     return {"presets": presets}
 
@@ -521,6 +522,7 @@ class App:
 
 
 def main():
+    global PRESETS
     ai_review.configure_stdio()
     parser = argparse.ArgumentParser(description="Branch diff viewer with AI review comments")
     parser.add_argument("--project", default=".")
@@ -530,7 +532,10 @@ def main():
     parser.add_argument("--session", help="Claude Code session id: new comments are bound to it")
     parser.add_argument("--exit-when-idle", type=float, default=0, metavar="SECONDS",
                         help="stop once no panel page has been open for this long (0: never)")
+    parser.add_argument("--presets", help="where the view presets are kept (default: next to this script)")
     args = parser.parse_args()
+    if args.presets:
+        PRESETS = os.path.abspath(args.presets)
     project = os.path.abspath(args.project)
     git = Git(project, args.base)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)

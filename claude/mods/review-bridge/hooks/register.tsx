@@ -4,6 +4,7 @@ import type { Register } from 'claude-code'
 import type { ReviewSummary } from '../types'
 import { createBridge } from './bridge'
 import { NOT_STARTED, openReviewPanel, ownPanelVerdict } from './panel'
+import { commandPrompt, promptPath } from './paths'
 import { createReviewServer } from './server'
 import type { ReviewServer } from './server'
 import { ownToolVerdict, runReviewTool, TOOL_SPECS } from './tools'
@@ -17,10 +18,16 @@ export const register: Register = on => {
   let server: ReviewServer | undefined
   let root = ''
   let shown: string | undefined | null = null
+  let submitLater: ((text: string) => void) | undefined
 
   on('session.start', async ($, e, next) => {
     root = await $.session.root()
     server = createReviewServer($)
+    submitLater = text => {
+      $.clock.after(0, () => {
+        void $.prompt.submit({ text, asUser: true }).catch(() => undefined)
+      })
+    }
     const isEnabled = (await $.store.get(`enabled:${root}`)) !== false
     $.ui.status(undefined)
     bridge = createBridge({
@@ -37,7 +44,7 @@ export const register: Register = on => {
         const value: ReviewSummary | null = text === undefined ? null : { text }
         void update($, summary, () => value)
       },
-    }, root, isEnabled)
+    }, root, isEnabled, promptPath($, 'review-rules'))
     await $.command.register({
       name: 'review-auto',
       description: 'Hand new review comments from .ai-review-comments.json to Claude automatically',
@@ -49,6 +56,14 @@ export const register: Register = on => {
       description: 'Open the branch review panel in the Claude Desktop built-in browser',
       argumentHint: '[--base <branch>]',
       immediate: true,
+    })
+    await $.command.register({
+      name: 'review-manual',
+      description: 'Process all review comments at once: questions first, then the work',
+    })
+    await $.command.register({
+      name: 'review-live',
+      description: 'Watch review comments and react to each one as it appears',
     })
     for (const spec of TOOL_SPECS) await $.tool.register({ ...spec, isDeferred: false })
     await bridge.start().catch(() => undefined)
@@ -99,6 +114,23 @@ export const register: Register = on => {
     return result.text ? { text: result.text } : {}
   })
 
+  on('command.run', { command: 'review-manual' }, async ($, e) => {
+    if (!submitLater) return { text: NOT_STARTED }
+    submitLater(commandPrompt($, 'review-manual', e.args))
+    return {}
+  })
+
+  on('command.run', { command: 'review-live' }, async ($, e) => {
+    if (!submitLater) return { text: NOT_STARTED }
+    const wasAuto = bridge?.isEnabled() === true
+    if (wasAuto) {
+      await bridge?.setEnabled(false)
+      await $.store.set(`enabled:${root}`, false)
+    }
+    submitLater(commandPrompt($, 'review-live', e.args))
+    return wasAuto ? { text: '/review-auto выключен: за комментариями теперь следит /review-live.' } : {}
+  })
+
   on('command.run', { command: 'review-auto' }, async ($, e) => {
     if (!bridge) return { text: NOT_STARTED }
     const arg = e.args.trim().toLowerCase()
@@ -110,7 +142,7 @@ export const register: Register = on => {
     }
     const state = bridge.isEnabled()
       ? 'включена: новые комментарии и ответы из панели ревью Claude берёт в работу сам'
-      : 'выключена: комментарии копятся, обработай их /review_comments'
+      : 'выключена: комментарии копятся, обработай их /review-manual'
     return { text: `Авто-обработка review-комментариев ${state}. Открытых сейчас: ${bridge.openCount()}.` }
   })
 

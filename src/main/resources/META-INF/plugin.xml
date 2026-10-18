@@ -9,7 +9,7 @@
       <li>Comment a selection, the current line, a file or a folder (Ctrl+Alt+,).</li>
       <li>Explorer → AI Review: all changes of the current branch (or of selected commits); every file opens
           in its own diff tab where you can comment right in the diff.</li>
-      <li>Comments are stored in <code>.ai-review-comments.json</code> and processed by <code>/review_comments</code>.</li>
+      <li>Comments are stored in <code>.ai-review-comments.json</code> and processed by <code>/review-manual</code>.</li>
     </ul>
     ]]></description>
 

@@ -4,8 +4,10 @@ import type { Engine } from 'claude-code/testing'
 
 export const ROOT = 'D:/proj'
 export const HOME = 'C:/Users/u'
-export const SCRIPT = `${HOME}/.claude/scripts/ai_review_web.py`
-export const HELPER = `${HOME}/.claude/scripts/ai_review.py`
+export const MOD = decodeURIComponent(new URL('..', import.meta.url).pathname).replace(/^\/([A-Za-z]:)/, '$1').replace(/\/$/, '')
+export const SCRIPT = `${MOD}/scripts/ai_review_web.py`
+export const HELPER = `${MOD}/scripts/ai_review.py`
+export const PRESETS = `${HOME}/.claude/review-bridge/presets.json`
 export const LAUNCH = `${ROOT}/.claude/launch.json`
 export const EXCLUDE = 'D:/.git/info/exclude'
 export const COMMENTS = `${ROOT}/.ai-review-comments.json`
@@ -41,6 +43,7 @@ export function world(on: On, options: WorldOptions = {}) {
   const shown: string[] = []
   const calls: string[] = []
   const toasts: string[] = []
+  const prompts: string[] = []
   mock.env(on, { USERPROFILE: HOME })
   on('session.root', () => ({ value: ROOT }))
   on('session.id', () => ({ value: SESSION }))
@@ -52,6 +55,10 @@ export function world(on: On, options: WorldOptions = {}) {
     return { value: { tool: `mcp__review-bridge__${e.name}` } }
   })
   on('ui.status', () => ({ value: undefined }))
+  on('prompt.submit', ($, e) => {
+    prompts.push(e.text)
+    return { text: e.text }
+  })
   on('ui.toast', ($, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -77,9 +84,9 @@ export function world(on: On, options: WorldOptions = {}) {
   })
   on('process.run', ($, e) => {
     if (e.argv[0] === 'python') {
-      helper.push({ argv: e.argv.slice(1), stdin: e.init?.stdin })
+      helper.push({ argv: e.argv.slice(2), stdin: e.init?.stdin })
       if (options.helperError) return { value: { exitCode: 1, stdout: '', stderr: options.helperError } }
-      return run(0, `${e.argv[5]}: ${e.argv[4]} ok\n`)
+      return run(0, `${e.argv[6]}: ${e.argv[5]} ok\n`)
     }
     const command = e.argv[1]
     git.push(command)
@@ -124,7 +131,7 @@ export function world(on: On, options: WorldOptions = {}) {
     return { result: 'Showing the preview pane.' }
   })
   const exitIdle = (port: number) => exits[port]?.()
-  return { files, served, spawned, git, helper, tools, exitIdle, opened, shown, toasts, calls }
+  return { files, served, spawned, git, helper, tools, prompts, exitIdle, opened, shown, toasts, calls }
 }
 
 export async function session($: Engine, on: On, options: WorldOptions = {}) {

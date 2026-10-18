@@ -1,6 +1,6 @@
 import { expect, test } from 'claude-code/testing'
 
-import { COMMENTS, HELPER, SESSION, session } from './world'
+import { COMMENTS, HELPER, session } from './world'
 
 const tool = (name: string) => `mcp__review-bridge__${name}`
 
@@ -22,7 +22,7 @@ test('open, show and status map onto the same helper commands', async ($, on) =>
   await $.tool.call({ tool: tool('open') })
   await $.tool.call({ tool: tool('show'), id: 'a1' })
   await $.tool.call({ tool: tool('status'), id: 'a1', status: 'IN_PROGRESS' })
-  expect(w.helper.map(r => r.argv.slice(3))).toEqual([['open', '--session', SESSION], ['show', 'a1'], ['status', 'a1', 'IN_PROGRESS']])
+  expect(w.helper.map(r => r.argv.slice(3))).toEqual([['open'], ['show', 'a1'], ['status', 'a1', 'IN_PROGRESS']])
 })
 
 test('a bad call is refused before anything runs, and a helper failure reaches the model as an error', async ($, on) => {

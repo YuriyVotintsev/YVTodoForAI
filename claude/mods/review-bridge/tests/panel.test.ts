@@ -1,9 +1,9 @@
 import { expect, test } from 'claude-code/testing'
 
 import { IDLE_EXIT_S, ownPanelVerdict, PREVIEW_START, SHOW_PANE } from '../hooks/panel'
-import { EXCLUDE, LAUNCH, ROOT, SCRIPT, SESSION, session } from './world'
+import { EXCLUDE, LAUNCH, PRESETS, ROOT, SCRIPT, SESSION, session } from './world'
 
-const IDLE = ['--exit-when-idle', String(IDLE_EXIT_S), '--session', SESSION]
+const IDLE = ['--exit-when-idle', String(IDLE_EXIT_S), '--session', SESSION, '--presets', PRESETS]
 const MINE = { project: ROOT, session: SESSION }
 const config = (text: string | undefined) =>
   (JSON.parse(text ?? '{}').configurations ?? []).find((c: { name?: string }) => c.name === 'code-review')
@@ -14,7 +14,7 @@ test('/review-panel starts the server itself and attaches the preview to it, qui
   expect(result.text).toBeUndefined()
   expect(config(w.files.get(LAUNCH))).toEqual({ name: 'code-review', url: 'http://localhost:7790', port: 7790 })
   expect(w.files.get(EXCLUDE)).toEndWith('\n**/.claude/launch.json\n')
-  expect(w.spawned).toEqual([['python', SCRIPT, '--port', '7790', ...IDLE]])
+  expect(w.spawned).toEqual([['python', '-B', SCRIPT, '--port', '7790', ...IDLE]])
   expect(w.opened).toEqual(['code-review'])
   expect(w.shown).toEqual(['preview'])
 })
@@ -25,7 +25,7 @@ test('the server outlives the tab: a second open reuses it, other arguments rest
   await $.command.run({ command: 'review-panel', args: '' })
   expect(w.spawned).toHaveLength(1)
   await $.command.run({ command: 'review-panel', args: '--base develop' })
-  expect(w.spawned).toEqual([['python', SCRIPT, '--port', '7790', ...IDLE], ['python', SCRIPT, '--port', '7790', ...IDLE, '--base', 'develop']])
+  expect(w.spawned).toEqual([['python', '-B', SCRIPT, '--port', '7790', ...IDLE], ['python', '-B', SCRIPT, '--port', '7790', ...IDLE, '--base', 'develop']])
   expect(w.served[7790]).toEqual(MINE)
   await $.session.end({ reason: 'exit' })
   await w.clock.settle()
@@ -48,7 +48,7 @@ test('another project holding the port moves the panel to the next one', async (
   const w = await session($, on, { ports: { 7790: 'D:/other' }, isIgnored: true })
   expect((await $.command.run({ command: 'review-panel', args: '--base develop' })).text).toBeUndefined()
   expect(config(w.files.get(LAUNCH))?.url).toBe('http://localhost:7791')
-  expect(w.spawned).toEqual([['python', SCRIPT, '--port', '7791', ...IDLE, '--base', 'develop']])
+  expect(w.spawned).toEqual([['python', '-B', SCRIPT, '--port', '7791', ...IDLE, '--base', 'develop']])
   expect(w.files.has(EXCLUDE)).toBe(false)
 })
 
@@ -64,7 +64,7 @@ test("this session's own running panel is opened as it is, another session's is 
 test('a panel of the same project but another session gets a server of its own', async ($, on) => {
   const w = await session($, on, { ports: { 7790: { project: ROOT, session: 'session-other' } }, isIgnored: true })
   await $.command.run({ command: 'review-panel', args: '' })
-  expect(w.spawned).toEqual([['python', SCRIPT, '--port', '7791', ...IDLE]])
+  expect(w.spawned).toEqual([['python', '-B', SCRIPT, '--port', '7791', ...IDLE]])
   expect(w.served[7791]).toEqual(MINE)
 })
 
@@ -87,7 +87,7 @@ test('a refused or missing piece is reported, never guessed around', async ($, o
   const w = await session($, on, { deny: 'not allowed here', isIgnored: true })
   expect((await $.command.run({ command: 'review-panel', args: '' })).text).toBe('Панель не открыта: not allowed here')
   w.files.delete(SCRIPT)
-  expect((await $.command.run({ command: 'review-panel', args: '' })).text).toContain('Не найден C:/Users/u/.claude/scripts/ai_review_web.py')
+  expect((await $.command.run({ command: 'review-panel', args: '' })).text).toBe(`Нет ${SCRIPT}: мод review-bridge установлен не целиком.`)
 })
 
 test('a server that dies on start is reported with its error and nothing is opened', async ($, on) => {

@@ -1,6 +1,7 @@
 import type { EngineInterface } from 'claude-code'
 
 import { FILE } from './bridge'
+import { scriptPath } from './paths'
 
 export const STATUSES = ['IN_PROGRESS', 'HAS_QUESTIONS', 'DONE', 'CANCELED']
 export const REVIEW_TOOLS = [
@@ -17,7 +18,7 @@ const STATUS = { type: 'string', enum: STATUSES }
 export const TOOL_SPECS = [
   {
     name: 'open',
-    description: 'Lists the branch review comments of this session (.ai-review-comments.json) that wait for you: id, status, place, text and the latest reply of the person.',
+    description: 'Lists the branch review comments (.ai-review-comments.json) that wait for you: id, status, place, text and the latest reply of the person.',
     inputSchema: { type: 'object', properties: {} },
   },
   {
@@ -53,12 +54,12 @@ export function ownToolVerdict<V extends Verdict>(verdict: V): V | Verdict {
 const failed = (text: string): ToolAnswer => ({ isError: true, result: text, text })
 const field = (input: Record<string, unknown>, key: string) => (typeof input[key] === 'string' ? (input[key] as string).trim() : '')
 
-export function reviewArgs(tool: ReviewTool, input: Record<string, unknown>, session: string): { argv: string[]; stdin?: string } | string {
+export function reviewArgs(tool: ReviewTool, input: Record<string, unknown>): { argv: string[]; stdin?: string } | string {
   const id = field(input, 'id')
   const status = field(input, 'status')
   if (tool !== REVIEW_TOOLS[0] && !id) return 'id is required'
   if (status && !STATUSES.includes(status)) return `status must be one of ${STATUSES.join(', ')}`
-  if (tool === REVIEW_TOOLS[0]) return { argv: ['open', '--session', session] }
+  if (tool === REVIEW_TOOLS[0]) return { argv: ['open'] }
   if (tool === REVIEW_TOOLS[1]) return { argv: ['show', id] }
   if (tool === REVIEW_TOOLS[2]) return status ? { argv: ['status', id, status] } : 'status is required'
   const text = field(input, 'text')
@@ -67,13 +68,12 @@ export function reviewArgs(tool: ReviewTool, input: Record<string, unknown>, ses
 }
 
 export async function runReviewTool($: EngineInterface, tool: ReviewTool, input: Record<string, unknown>): Promise<ToolAnswer> {
-  const args = reviewArgs(tool, input, await $.session.id())
+  const args = reviewArgs(tool, input)
   if (typeof args === 'string') return failed(args)
   const root = await $.session.root()
-  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
-  const script = `${home}/.claude/scripts/ai_review.py`.split('\\').join('/')
-  if (!home || !(await $.fs.exists(script))) return failed(`Не найден ${script}: скопируй claude/scripts из YVTodoForAI в ~/.claude/scripts.`)
-  const run = await $.process.run(['python', script, '--file', `${root}/${FILE}`, ...args.argv], {
+  const script = scriptPath($, 'ai_review.py')
+  if (!(await $.fs.exists(script))) return failed(`Нет ${script}: мод review-bridge установлен не целиком.`)
+  const run = await $.process.run(['python', '-B', script, '--file', `${root}/${FILE}`, ...args.argv], {
     cwd: root,
     ...(args.stdin === undefined ? {} : { stdin: args.stdin }),
     timeoutMs: 15000,

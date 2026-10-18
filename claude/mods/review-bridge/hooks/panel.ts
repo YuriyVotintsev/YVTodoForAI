@@ -1,5 +1,6 @@
 import type { EngineInterface } from 'claude-code'
 
+import { presetsPath, scriptPath, slash } from './paths'
 import type { ReviewServer } from './server'
 
 export const SERVER_NAME = 'code-review'
@@ -29,7 +30,6 @@ export function ownPanelVerdict<V extends Verdict>(tool: string, origin: string 
 type LaunchConfig = { name?: string; url?: string; runtimeExecutable?: string; runtimeArgs?: string[]; port?: number }
 type LaunchFile = { version?: string; configurations?: LaunchConfig[] }
 
-const slash = (path: string) => path.split('\\').join('/')
 const samePath = (a: string, b: string) => slash(a).replace(/\/+$/, '').toLowerCase() === slash(b).replace(/\/+$/, '').toLowerCase()
 
 async function portOwner($: EngineInterface, port: number): Promise<{ project?: unknown; session?: unknown } | null | undefined> {
@@ -67,11 +67,8 @@ export async function openReviewPanel($: EngineInterface, args: string, server: 
   if (!server) return { isOpened: false, text: NOT_STARTED }
   const isShownEarly = (await callTool($, SHOW_PANE, { pane: 'preview' })) === undefined
   const root = await $.session.root()
-  const home = (await $.env.get('USERPROFILE')) ?? (await $.env.get('HOME'))
-  const script = slash(`${home}/.claude/scripts/ai_review_web.py`)
-  if (!home || !(await $.fs.exists(script))) {
-    return { isOpened: false, text: `Не найден ${script}: скопируй claude/scripts из YVTodoForAI в ~/.claude/scripts.` }
-  }
+  const script = scriptPath($, 'ai_review_web.py')
+  if (!(await $.fs.exists(script))) return { isOpened: false, text: `Нет ${script}: мод review-bridge установлен не целиком.` }
 
   const launchPath = `${root}/.claude/launch.json`
   const launchText = await $.fs.read(launchPath).then(String, () => undefined)
@@ -102,7 +99,9 @@ export async function openReviewPanel($: EngineInterface, args: string, server: 
 
   if (!picked.isServed) {
     const extra = args.trim() ? args.trim().split(/\s+/) : []
-    const argv = ['python', script, '--port', String(port), '--exit-when-idle', String(IDLE_EXIT_S), '--session', session, ...extra]
+    const presets = await presetsPath($)
+    const argv = ['python', '-B', script, '--port', String(port), '--exit-when-idle', String(IDLE_EXIT_S), '--session', session,
+      ...(presets ? ['--presets', presets] : []), ...extra]
     const down = await server.ensure(port, argv, root)
     if (down) return { isOpened: false, text: `Панель не открыта: ${down}` }
   }

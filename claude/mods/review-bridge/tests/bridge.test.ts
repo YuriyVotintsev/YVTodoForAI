@@ -6,6 +6,7 @@ import { sha1, statusText } from '../hooks/review'
 const ROOT = 'D:/proj'
 const PATH = `${ROOT}/${FILE}`
 const LIVE = `${PATH}.live`
+const RULES = 'D:/mods/review-bridge/prompts/review-rules.md'
 
 const ME = 'session-me'
 const pending = (id: string, extra = {}) => ({ id, filePath: 'Assets/A.cs', startLine: 5, endLine: 7, comment: `fix ${id}`, status: 'PENDING', sessionId: ME, ...extra })
@@ -43,7 +44,7 @@ function setup(initial: object[] | undefined, isEnabled = true) {
       statuses.push(text)
     },
     session: async () => session,
-  }, ROOT, isEnabled)
+  }, ROOT, isEnabled, RULES)
   const settle = async () => {
     for (let i = 0; i < 20; i++) await Promise.resolve()
   }
@@ -73,7 +74,7 @@ test('a new comment from the panel wakes Claude once, after a quiet pause', asyn
   expect(s.submitted).toHaveLength(1)
   expect(s.submitted[0]).toStartWith('b2222222 · Assets/A.cs:5-7\nfix b2222222\n\n')
   expect(s.submitted[0]).toContain('`reply`')
-  expect(s.submitted[0]).toContain('review_live.md')
+  expect(s.submitted[0]).toEndWith(`«Реакция на комментарий» в \`${RULES}\`.`)
   expect(s.statuses.at(-1)).toBe('Review: 1 open')
 })
 

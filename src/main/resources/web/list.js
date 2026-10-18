@@ -63,8 +63,8 @@
       '<span class="sp"></span>' +
       (L.live
         ? '<span class="live" title="Сессия Claude Code следит за комментариями и отвечает сразу">● Claude на связи</span>'
-        : '<span class="hint dim" title="/review_live — Claude следит и отвечает сразу; /review_comments — разобрать всё пачкой">' +
-          'Claude: <code>/review_live</code> или <code>/review_comments</code></span>') +
+        : '<span class="hint dim" title="/review-live — Claude следит и отвечает сразу; /review-manual — разобрать всё пачкой">' +
+          'Claude: <code>/review-live</code> или <code>/review-manual</code></span>') +
       (L.filter === 'done' && n.done
         ? '<button class="ghost" id="closeAllBtn" title="Перенести все выполненные и отменённые в «Завершённые»">' + icon('archive') + ' Завершить все</button>'
         : '') +
@@ -143,7 +143,7 @@
         '<li>ПКМ по файлу или папке в дереве проекта — комментарий ко всему файлу или папке.</li>' +
         '<li>Explorer → вид «AI Review» — все изменения ветки; файл открывается в diff, комментарии пишутся прямо там.</li>' +
         '<li>Git Log → выделите один или два коммита → ПКМ → «AI Review: …».</li>' +
-        '<li>Когда закончите — запустите <code>/review_comments</code> в Claude Code.</li></ul>';
+        '<li>Когда закончите — запустите <code>/review-manual</code> в Claude Code.</li></ul>';
     return h('div', { class: 'empty', html: text });
   }
 

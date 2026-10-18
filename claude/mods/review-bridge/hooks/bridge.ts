@@ -22,7 +22,7 @@ const MAX_EVENTS = 20
 
 type LiveFile = { heartbeat?: number; sessions?: Record<string, unknown>; comments?: State }
 
-export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
+export function createBridge(io: BridgeIO, root: string, isEnabled: boolean, rules: string) {
   const file = `${root}/${FILE}`
   const live = `${file}.live`
   let enabled = isEnabled
@@ -74,7 +74,7 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean) {
     const shown = blocks.length > MAX_EVENTS
       ? [...blocks.slice(0, MAX_EVENTS), `… и ещё ${blocks.length - MAX_EVENTS}, полный список — инструмент \`open\``]
       : blocks
-    await io.submit(promptText(shown))
+    await io.submit(promptText(shown, rules))
   }
 
   async function queue(found: string[]) {

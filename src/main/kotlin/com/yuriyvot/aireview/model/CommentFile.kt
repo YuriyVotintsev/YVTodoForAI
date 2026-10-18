@@ -19,7 +19,7 @@ object CommentFile {
 
     private val INSTRUCTIONS = """
 Code review comments written in the IDE (YVTodoForAI plugin) for an AI assistant.
-Process them with /review_comments (all at once) or /review_live (react to each comment as it appears).
+Process them with /review-manual (all at once) or /review-live (react to each comment as it appears).
 
 Comment fields:
 - id: unique id.
@@ -42,7 +42,7 @@ Comment fields:
 - createdAt: unix time, ms.
 
 Rules for the AI: change only status, questions and thread; keep unknown fields; never delete comments.
-Prefer ~/.claude/scripts/ai_review.py (say / status / open / watch) over editing this file by hand.
+Prefer the review-bridge mod's tools (mcp__review-bridge__open / show / status / reply) over editing this file by hand.
 The IDE picks up changes of this file automatically.
 """.trim()
 

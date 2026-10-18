@@ -115,12 +115,12 @@ export async function scan(prev: State, comments: Comment[], session: string): P
   return { events: found, state }
 }
 
-export function promptText(blocks: string[]): string {
+export function promptText(blocks: string[], rules: string): string {
   return [
     ...blocks,
     'Это из панели ревью. Возьми (`status` IN_PROGRESS), сделай или ответь и напиши итог в переписку комментария ' +
-      '(`reply`, статус DONE или HAS_QUESTIONS) инструментами review-bridge; порядок — «Реакция на события» ' +
-      'в `~/.claude/commands/review_live.md`.',
+      '(`reply`, статус DONE или HAS_QUESTIONS) инструментами review-bridge; порядок — «Реакция на комментарий» ' +
+      `в \`${rules}\`.`,
   ].join('\n\n')
 }
 
