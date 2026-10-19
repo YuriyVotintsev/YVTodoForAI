@@ -73,16 +73,15 @@ export const register: Register = on => {
     return next(e)
   })
 
-  on('ui.render', { component: 'SessionMode' }, async ($, e, next) => {
+  on('ui.render', { component: 'SessionMode' }, async ($, e) => {
     const value = await read($, summary)
-    if (!value) return next(e)
     const opening = await read($, isOpening)
     const { Box, Button, Text } = $.ui.resolve(e)
     return (
       <Box>
         {e.props.modes.length > 0 && <Text dimColor>{e.props.modes.join(' & ')} </Text>}
         <Button key="review-open-panel" plain dimColor={opening} onPress={() => undefined}>
-          {opening ? 'Review: открываю панель…' : value.text}
+          {opening ? 'Review: открываю панель…' : value?.text ?? 'Review'}
         </Button>
       </Box>
     )

@@ -38,11 +38,18 @@ test('with nothing open, or nothing of this session, the button stays to open th
   await ui.unmount()
 })
 
-test('a project with no review file leaves the footer to the engine', async ($, on) => {
-  await startSession($, on, undefined)
+test('a project with no review file still shows the button to open the panel', async ($, on) => {
+  const w = await startSession($, on, undefined)
   const ui = await $.ui.mount({ plugin: 'review-bridge', surface: 'desktop', component: 'SessionMode', props: { modes: [] } })
-  expect(await ui.find({ key: 'review-open-panel' })).toBeUndefined()
-  expect(await ui.find({ type: 'Text', text: /engine line/ })).toBeDefined()
+  expect((await ui.find({ key: 'review-open-panel' }))?.text).toBe('Review')
+  await ui.press({ key: 'review-open-panel' })
+  expect(w.opened).toEqual(['code-review'])
+  await ui.unmount()
+})
+
+test('the button is there before the bridge has reported anything', async ($, on) => {
+  const ui = await $.ui.mount({ plugin: 'review-bridge', surface: 'desktop', component: 'SessionMode', props: { modes: [] } })
+  expect((await ui.find({ key: 'review-open-panel' }))?.text).toBe('Review')
   await ui.unmount()
 })
 

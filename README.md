@@ -55,7 +55,8 @@ Everything for Claude Code is one mod, `claude/mods/review-bridge/`:
     answers in the thread without running `ai_review.py` through Bash; they call that same helper, so the file keeps
     one writer, and `open` lists every open comment of the file;
   - shows a "Review" button in the prompt footer that opens the panel, with this session's open comments on it
-    ("Review: 2 open · 1 question"); it stays while the project has a review file, even with nothing open;
+    ("Review: 2 open · 1 question"); the button is always there, with no review file and before the mod has
+    read one;
   - `/review-panel [--base <branch>]` opens the panel without a model turn: picks a free port (7790–7799), starts the
     server itself with `--exit-when-idle 60` (an open panel page holds an event stream to it, so the server stops a
     minute after the last panel closes and the next open starts it again in a fraction of a second),
