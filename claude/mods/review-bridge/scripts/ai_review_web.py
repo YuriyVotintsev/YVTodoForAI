@@ -144,7 +144,7 @@ class Git:
         return p.stdout.decode("utf-8", "replace")
 
     def detect_base(self):
-        for ref in ("main", "master", "origin/main", "origin/master"):
+        for ref in ("origin/main", "main", "origin/master", "master"):
             if self.run("rev-parse", "--verify", "--quiet", ref + "^{commit}", ok=(0, 1)).strip():
                 return ref
         return "HEAD"
@@ -527,7 +527,7 @@ def main():
     parser = argparse.ArgumentParser(description="Branch diff viewer with AI review comments")
     parser.add_argument("--project", default=".")
     parser.add_argument("--port", type=int, default=7790)
-    parser.add_argument("--base", help="base branch (default: main/master)")
+    parser.add_argument("--base", help="base branch (default: origin/main, main, origin/master, master)")
     parser.add_argument("--file", default=".ai-review-comments.json")
     parser.add_argument("--session", help="Claude Code session id: new comments are bound to it")
     parser.add_argument("--exit-when-idle", type=float, default=0, metavar="SECONDS",
