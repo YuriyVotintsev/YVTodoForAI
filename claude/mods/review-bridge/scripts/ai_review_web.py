@@ -260,7 +260,29 @@ class Git:
         match = next((x for x in parsed if x["path"] == path), parsed[0] if parsed else None)
         if match:
             result["hunks"], result["binary"] = match["hunks"], match["binary"]
+        if context == "full" and not result["hunks"] and not result["binary"] and f["status"] != "D":
+            lines = self.text_at(changes["newRev"], path)
+            if lines is None:
+                result["binary"] = True
+            elif lines:
+                result["hunks"] = [{"header": "@@ -1,%d +1,%d @@" % (len(lines), len(lines)), "section": "",
+                                    "lines": [{"t": " ", "o": i + 1, "n": i + 1, "s": s} for i, s in enumerate(lines)]}]
         return result
+
+    def text_at(self, rev, path):
+        if rev is None:
+            return self.read_text(path)
+        try:
+            data = subprocess.run(["git", "show", "%s:./%s" % (rev, path)], cwd=self.project, capture_output=True,
+                                  creationflags=NO_WINDOW, check=True).stdout
+        except subprocess.CalledProcessError:
+            return None
+        if len(data) > MAX_TEXT or b"\0" in data[:8000]:
+            return None
+        lines = data.decode("utf-8-sig", "replace").split("\n")
+        if lines and lines[-1] == "":
+            lines.pop()
+        return [s.rstrip("\r") for s in lines]
 
 
 def load_presets():

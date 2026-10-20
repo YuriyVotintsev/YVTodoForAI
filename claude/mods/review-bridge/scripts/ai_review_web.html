@@ -737,7 +737,10 @@ function halfHtml(r, side, lang) {
 }
 function bodyHtml(f, c) {
   if (c.binary) return '<div class="fnote">Binary file — no text diff.</div>';
-  if (!c.rows.length) return `<div class="fnote">${f.status === 'R' ? 'Renamed without changes.' : 'No content changes.'}</div>`;
+  if (!c.rows.length) {
+    const whole = !S.opts.full && S.raw.get(rawKey(f))?.hunks.length ? ` <button class="lnk" data-act="opt-full">Show entire file</button>` : '';
+    return `<div class="fnote">${f.status === 'R' ? 'Renamed without changes.' : 'No content changes.'}${whole}</div>`;
+  }
   if (c.rows.length > BIG && !S.forceBig.has(f.path)) return `<div class="fnote">Large diff · ${c.rows.length.toLocaleString()} lines. <button class="lnk" data-act="show-big">Show anyway</button></div>`;
   const lang = langOf(f.path);
   if (S.view === 'split') return c.split.map((p, k) => p.h ? hunkHtml(p.h)
