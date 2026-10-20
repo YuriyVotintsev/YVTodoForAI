@@ -10,7 +10,7 @@
   --text: #1f1e1d; --text-2: #3d3c38; --dim: #77756c; --faint: #a6a399;
   --green: #2e7d32; --red: #c0392b;
   --add: rgba(46,160,67,.11); --add-g: rgba(46,160,67,.19); --del: rgba(220,60,50,.09); --del-g: rgba(220,60,50,.17);
-  --accent: #2f6fe4; --accent-soft: rgba(47,111,228,.12); --sel: rgba(47,111,228,.14); --cmt: rgba(47,111,228,.09);
+  --accent: #2f6fe4; --accent-soft: rgba(47,111,228,.12); --sel: rgba(47,111,228,.14); --cmt: rgba(47,111,228,.09); --same: rgba(183,121,31,.16);
   --hunk: #f0eee7; --shadow: 0 6px 22px rgba(0,0,0,.08); --scrim: rgba(30,28,24,.28);
   --claude: #c96442; --amber: #b7791f; --sky: #1b8ad3;
   --k: #8a3ccf; --s: #9a6700; --c: #8b887f; --nm: #b4580c; --ty: #0b6a9e; --pp: #6e56cf;
@@ -25,7 +25,7 @@
     --text: #f0eee6; --text-2: #d6d3c8; --dim: #a19f96; --faint: #6f6d66;
     --green: #74c476; --red: #ec6f63;
     --add: rgba(70,150,95,.16); --add-g: rgba(70,150,95,.26); --del: rgba(229,83,75,.14); --del-g: rgba(229,83,75,.24);
-    --accent: #3b7ff2; --accent-soft: rgba(59,127,242,.2); --sel: rgba(90,135,215,.2); --cmt: rgba(59,127,242,.14);
+    --accent: #3b7ff2; --accent-soft: rgba(59,127,242,.2); --sel: rgba(90,135,215,.2); --cmt: rgba(59,127,242,.14); --same: rgba(224,164,58,.18);
     --hunk: #2b2b29; --shadow: 0 10px 30px rgba(0,0,0,.4); --scrim: rgba(0,0,0,.5);
     --claude: #d97757; --amber: #e0a43a; --sky: #6cc4ff;
     --k: #c9a2f2; --s: #e3c08d; --c: #807d75; --nm: #f0a774; --ty: #86c6ec; --pp: #b4a6ff;
@@ -121,6 +121,7 @@ svg { flex: none; }
 .fh .nm { color: var(--text); overflow: hidden; text-overflow: ellipsis; min-width: 48px; flex: 0 1 auto; }
 .it .nm.added, .fh .nm.added { color: var(--green); }
 .it .nm.deleted, .fh .nm.deleted { color: var(--red); }
+.it .nm.moved, .fh .nm.moved { color: var(--pp); }
 .fh { overflow: hidden; }
 .fh > :not(.nm):not(.pt):not(.spacer) { flex-shrink: 0; }
 .fh .pt { color: var(--dim); overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 13px; direction: rtl; text-align: left; }
@@ -163,6 +164,7 @@ svg { flex: none; }
 .nav .ib:disabled { opacity: .35; pointer-events: none; }
 .fb { font-family: var(--mono); font-size: 12.5px; line-height: 1.62; padding-bottom: 6px; }
 .fnote { font-family: var(--ui); color: var(--dim); padding: 14px 20px; font-size: 13.5px; }
+.fnote.same { background: var(--same); color: var(--text-2); padding: 8px 20px; }
 .lnk { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; }
 .hh { padding: 4px 14px 4px 94px; color: var(--dim); background: var(--hunk); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .hh:not(:first-child) { margin-top: 2px; }
@@ -193,7 +195,7 @@ svg { flex: none; }
 .lsel::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: var(--accent); z-index: 1; }
 .dragging, .dragging * { cursor: ns-resize !important; user-select: none !important; }
 .slot { font-family: var(--ui); font-size: 13.5px; line-height: 1.5; padding: 6px 18px 8px 52px; }
-.slot.top { padding-top: 12px; }
+.slot.ftop { padding-top: 12px; }
 .composer { background: var(--panel); border: 1px solid var(--border-strong); border-radius: 12px; padding: 10px 10px 10px 14px; box-shadow: var(--shadow); max-width: 780px; }
 .composer .lbl { color: var(--dim); font-size: 13px; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .composer .in { display: flex; gap: 8px; align-items: flex-end; }
@@ -580,7 +582,8 @@ const funcText = s => new TextDecoder().decode(new TextEncoder().encode(s).slice
 const range = (start, count) => count === 1 ? `${start}` : `${start},${count}`;
 function withContext(raw, ctx) {
   const copy = lines => lines.map(r => ({ ...r }));
-  if (ctx === 'full' || raw.binary) return { ...raw, hunks: raw.hunks.map(h => ({ ...h, lines: copy(h.lines) })) };
+  const unchanged = raw.hunks.length > 0 && raw.hunks.every(h => h.lines.every(r => r.t === ' '));
+  if (ctx === 'full' || raw.binary || unchanged) return { ...raw, unchanged, hunks: raw.hunks.map(h => ({ ...h, lines: copy(h.lines) })) };
   const n = +ctx;
   const lines = copy(raw.hunks.flatMap(h => h.lines));
   const near = new Array(lines.length);
@@ -740,19 +743,18 @@ function halfHtml(r, side, lang) {
 }
 function bodyHtml(f, c) {
   if (c.binary) return '<div class="fnote">Binary file — no text diff.</div>';
-  if (!c.rows.length) {
-    const whole = !S.opts.full && S.raw.get(rawKey(f))?.hunks.length ? ` <button class="lnk" data-act="opt-full">Show entire file</button>` : '';
-    return `<div class="fnote">${f.status === 'R' ? 'Renamed without changes.' : 'No content changes.'}${whole}</div>`;
-  }
+  const same = f.status === 'R' ? 'Renamed without changes.' : 'No content changes.';
+  if (!c.rows.length) return `<div class="fnote">${same}</div>`;
   if (c.rows.length > BIG && !S.forceBig.has(f.path)) return `<div class="fnote">Large diff · ${c.rows.length.toLocaleString()} lines. <button class="lnk" data-act="show-big">Show anyway</button></div>`;
   const lang = langOf(f.path);
-  if (S.view === 'split') return c.split.map((p, k) => p.h ? hunkHtml(p.h)
+  const note = c.unchanged ? `<div class="fnote same">${same} The whole file is shown.</div>` : '';
+  if (S.view === 'split') return note + c.split.map((p, k) => p.h ? hunkHtml(p.h)
     : `<div class="row sp" data-s="${k}"${attr('o', p.o?.o)}${attr('n', p.n?.n)}>${halfHtml(p.o, 'o', lang)}${halfHtml(p.n, 'n', lang)}</div>`).join('');
-  return c.hunks.map(h => hunkHtml(h) + h.lines.map(r => rowHtml(r, lang)).join('')).join('');
+  return note + c.hunks.map(h => hunkHtml(h) + h.lines.map(r => rowHtml(r, lang)).join('')).join('');
 }
 const countsHtml = f => f.additions || f.deletions || f.binary
   ? `<span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>` : '';
-const nameHtml = (f, name) => `<span class="nm${f.untracked || f.status === 'A' ? ' added' : f.status === 'D' ? ' deleted' : ''}">${esc(name)}</span>`;
+const nameHtml = (f, name) => `<span class="nm${f.untracked || f.status === 'A' ? ' added' : f.status === 'D' ? ' deleted' : f.status === 'R' ? ' moved' : ''}">${esc(name)}</span>`;
 function headHtml(f) {
   const [dir, name] = splitPath(f.path);
   const badge = f.untracked ? 'Untracked' : { A: 'New', D: 'Deleted', R: 'Renamed', T: 'Type changed' }[f.status];
@@ -822,7 +824,7 @@ function renderSlots(force) {
     groups.get(row).push(c);
   }
   for (const [row, list] of groups) {
-    const html = `<div class="slot cms${row ? '' : ' top'}">${list.map(cardHtml).join('')}</div>`;
+    const html = `<div class="slot cms${row ? '' : ' ftop'}">${list.map(cardHtml).join('')}</div>`;
     if (row) row.insertAdjacentHTML('afterend', html); else body.insertAdjacentHTML('afterbegin', html);
   }
   return true;
@@ -1248,7 +1250,7 @@ function mountComposer(focus) {
   if (!c || !body || c.path !== S.cur) return;
   if (c.whole) {
     const html = composerHtml('Whole file', vtag(fileSide(fileByPath(c.path))), c.text, '');
-    const top = body.querySelector(':scope > .slot.cms.top');
+    const top = body.querySelector(':scope > .slot.cms.ftop');
     if (top) top.insertAdjacentHTML('afterend', html); else body.insertAdjacentHTML('afterbegin', html);
   } else {
     if (!S.sel || S.sel.mode !== selMode()) return;
