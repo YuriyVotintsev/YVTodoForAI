@@ -10,7 +10,7 @@
   --text: #1f1e1d; --text-2: #3d3c38; --dim: #77756c; --faint: #a6a399;
   --green: #2e7d32; --red: #c0392b;
   --add: rgba(46,160,67,.11); --add-g: rgba(46,160,67,.19); --del: rgba(220,60,50,.09); --del-g: rgba(220,60,50,.17);
-  --accent: #2f6fe4; --accent-soft: rgba(47,111,228,.12); --sel: rgba(47,111,228,.14);
+  --accent: #2f6fe4; --accent-soft: rgba(47,111,228,.12); --sel: rgba(47,111,228,.14); --cmt: rgba(47,111,228,.09);
   --hunk: #f0eee7; --shadow: 0 6px 22px rgba(0,0,0,.08); --scrim: rgba(30,28,24,.28);
   --claude: #c96442; --amber: #b7791f; --sky: #1b8ad3;
   --k: #8a3ccf; --s: #9a6700; --c: #8b887f; --nm: #b4580c; --ty: #0b6a9e; --pp: #6e56cf;
@@ -25,7 +25,7 @@
     --text: #f0eee6; --text-2: #d6d3c8; --dim: #a19f96; --faint: #6f6d66;
     --green: #74c476; --red: #ec6f63;
     --add: rgba(70,150,95,.16); --add-g: rgba(70,150,95,.26); --del: rgba(229,83,75,.14); --del-g: rgba(229,83,75,.24);
-    --accent: #3b7ff2; --accent-soft: rgba(59,127,242,.2); --sel: rgba(90,135,215,.2);
+    --accent: #3b7ff2; --accent-soft: rgba(59,127,242,.2); --sel: rgba(90,135,215,.2); --cmt: rgba(59,127,242,.14);
     --hunk: #2b2b29; --shadow: 0 10px 30px rgba(0,0,0,.4); --scrim: rgba(0,0,0,.5);
     --claude: #d97757; --amber: #e0a43a; --sky: #6cc4ff;
     --k: #c9a2f2; --s: #e3c08d; --c: #807d75; --nm: #f0a774; --ty: #86c6ec; --pp: #b4a6ff;
@@ -88,7 +88,8 @@ svg { flex: none; }
 .it .fi { color: var(--dim); display: grid; place-items: center; width: 16px; }
 .it > .fi, .it > .chev, .it > .num, .it > .cbub { flex: none; }
 .it .nm { color: var(--text); overflow: hidden; text-overflow: ellipsis; flex: 0 1 auto; min-width: 40px; }
-.it.hc .nm, .it.hc .fi { color: var(--accent); }
+.it.hc:not(.dir) { background: var(--cmt); }
+.it.hc:not(.dir):hover, .it.hc:not(.dir).act { background: var(--raise); }
 .it .pt { color: var(--dim); overflow: hidden; text-overflow: ellipsis; flex: 1 1 0; min-width: 0; font-size: 12.5px; direction: rtl; text-align: right; margin-left: 4px; }
 .num { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .plus { color: var(--green); }
@@ -118,6 +119,8 @@ svg { flex: none; }
 .fh { position: sticky; top: 0; z-index: 3; display: flex; align-items: center; gap: 9px; height: 42px; padding: 0 8px 0 16px; background: var(--bg); white-space: nowrap; min-width: 0; font-size: 14px; box-shadow: 0 1px 0 var(--border); }
 .fh .fi { color: var(--dim); display: grid; place-items: center; }
 .fh .nm { color: var(--text); overflow: hidden; text-overflow: ellipsis; min-width: 48px; flex: 0 1 auto; }
+.it .nm.added, .fh .nm.added { color: var(--green); }
+.it .nm.deleted, .fh .nm.deleted { color: var(--red); }
 .fh { overflow: hidden; }
 .fh > :not(.nm):not(.pt):not(.spacer) { flex-shrink: 0; }
 .fh .pt { color: var(--dim); overflow: hidden; text-overflow: ellipsis; min-width: 0; font-size: 13px; direction: rtl; text-align: left; }
@@ -747,6 +750,9 @@ function bodyHtml(f, c) {
     : `<div class="row sp" data-s="${k}"${attr('o', p.o?.o)}${attr('n', p.n?.n)}>${halfHtml(p.o, 'o', lang)}${halfHtml(p.n, 'n', lang)}</div>`).join('');
   return c.hunks.map(h => hunkHtml(h) + h.lines.map(r => rowHtml(r, lang)).join('')).join('');
 }
+const countsHtml = f => f.additions || f.deletions || f.binary
+  ? `<span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>` : '';
+const nameHtml = (f, name) => `<span class="nm${f.untracked || f.status === 'A' ? ' added' : f.status === 'D' ? ' deleted' : ''}">${esc(name)}</span>`;
 function headHtml(f) {
   const [dir, name] = splitPath(f.path);
   const badge = f.untracked ? 'Untracked' : { A: 'New', D: 'Deleted', R: 'Renamed', T: 'Type changed' }[f.status];
@@ -764,7 +770,7 @@ function headHtml(f) {
     <button class="ib" data-act="ctx-more" title="More context lines (now ${o.ctx})"${o.full || o.ctx >= CTX_STEPS[CTX_STEPS.length - 1] ? ' disabled' : ''}>${I.more}</button>
     <button class="ib${on(o.full)}" data-act="opt-full" title="Show entire file">${I.full}</button>
     <button class="ib${on(S.view === 'split')}" data-act="opt-split" title="Side-by-side">${I.split}</button></span>`;
-  return `${nav}<span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="pt" title="${esc(f.path)}"><span dir="ltr">${esc(dir)}</span></span>${badge ? `<span class="badge">${badge}</span>` : ''}<span class="spacer"></span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}<span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>${tb}`;
+  return `${nav}<span class="fi">${fileIcon(f.path)}</span>${nameHtml(f, name)}<span class="pt" title="${esc(f.path)}"><span dir="ltr">${esc(dir)}</span></span>${badge ? `<span class="badge">${badge}</span>` : ''}<span class="spacer"></span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}${countsHtml(f)}${tb}`;
 }
 
 const fileBody = () => document.querySelector('#diffs .fb');
@@ -863,7 +869,7 @@ function fileItemHtml(f, depth) {
   const all = commentsOf(f);
   const n = openCount(all);
   const tree = depth >= 0;
-  return `<div class="it${S.cur === f.path ? ' act' : ''}${all.length ? ' hc' : ''}" data-path="${esc(f.path)}" title="${esc(f.path)}"${tree ? ` style="padding-left:${28 + depth * 14}px"` : ''}><span class="fi">${fileIcon(f.path)}</span><span class="nm">${esc(name)}</span><span class="num plus">+${f.additions}</span><span class="num minus">-${f.deletions}</span>${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}${tree ? '' : `<span class="pt"><span dir="ltr">${esc(dir)}</span></span>`}<button class="ib dcb" data-act="file-comment" data-path="${esc(f.path)}" title="Comment on the whole file">${I.bubble}</button></div>`;
+  return `<div class="it${S.cur === f.path ? ' act' : ''}${all.length ? ' hc' : ''}" data-path="${esc(f.path)}" title="${esc(f.path)}"${tree ? ` style="padding-left:${28 + depth * 14}px"` : ''}><span class="fi">${fileIcon(f.path)}</span>${nameHtml(f, name)}${countsHtml(f)}${n ? `<span class="cbub">${I.bubble}${n}</span>` : ''}${tree ? '' : `<span class="pt"><span dir="ltr">${esc(dir)}</span></span>`}<button class="ib dcb" data-act="file-comment" data-path="${esc(f.path)}" title="Comment on the whole file">${I.bubble}</button></div>`;
 }
 const dirComments = path => S.comments.filter(c => c.filePath === path);
 function dirItemHtml(row) {
