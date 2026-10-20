@@ -119,23 +119,27 @@ test('a burst of comments goes to Claude as one prompt', async () => {
   expect(s.submitted[0]).toStartWith(['c1', 'c2', 'c3'].map(id => `${id} · Assets/A.cs:5-7\nfix ${id}`).join('\n\n'))
 })
 
-test('off stops prompts and drops the live heartbeat; on resumes without replaying', async () => {
+test('off stops prompts and drops the live heartbeat; on hands over what is still pending', async () => {
   const s = setup([pending('a1')])
   await s.bridge.start()
   await s.bridge.tick()
   expect(s.live().heartbeat).toBeGreaterThan(0)
   await s.bridge.setEnabled(false)
   expect(s.live().heartbeat).toBe(0)
-  s.write([pending('a1'), pending('b2')])
+  s.write([pending('a1'), pending('b2'), pending('c3', { status: 'IN_PROGRESS' }), pending('d4', { sessionId: 'session-other' })])
   await s.bridge.tick()
   await s.advance(QUIET_MS)
   expect(s.submitted).toHaveLength(0)
-  expect(s.statuses.at(-1)).toBe('Review: 2 open · auto off')
+  expect(s.statuses.at(-1)).toBe('Review: 3 open · 1 in progress · auto off')
   await s.bridge.setEnabled(true)
   await s.bridge.tick()
   await s.advance(QUIET_MS)
-  expect(s.submitted).toHaveLength(0)
+  expect(s.submitted).toHaveLength(1)
+  expect(s.submitted[0]).toStartWith('a1 · Assets/A.cs:5-7\nfix a1\n\nb2 · Assets/A.cs:5-7\nfix b2\n\n')
   expect(s.live().heartbeat).toBeGreaterThan(0)
+  await s.bridge.setEnabled(true)
+  await s.advance(QUIET_MS)
+  expect(s.submitted).toHaveLength(1)
 })
 
 test('each session keeps its own heartbeat in the live file and takes only it away', async () => {

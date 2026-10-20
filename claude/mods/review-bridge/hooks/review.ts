@@ -103,6 +103,10 @@ export function events(prev: Fingerprint | undefined, cur: Fingerprint, c: Comme
   return out
 }
 
+export function waiting(comments: Comment[], session: string): string[] {
+  return comments.filter(c => c.id && isMine(c, session) && status(c) === 'PENDING').map(c => block(c, '', full(c.comment)))
+}
+
 export async function scan(prev: State, comments: Comment[], session: string): Promise<{ events: string[]; state: State }> {
   const state: State = {}
   const found: string[] = []

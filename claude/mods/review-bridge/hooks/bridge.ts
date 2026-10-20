@@ -1,4 +1,4 @@
-import { isMine, isOpen, parseComments, promptText, scan, statusText } from './review'
+import { isMine, isOpen, parseComments, promptText, scan, statusText, waiting } from './review'
 import type { Comment, State } from './review'
 
 export type Timer = { cancel: () => void }
@@ -145,9 +145,11 @@ export function createBridge(io: BridgeIO, root: string, isEnabled: boolean, rul
   }
 
   async function setEnabled(value: boolean) {
+    const wasEnabled = enabled
     enabled = value
     if (value) {
       lastBeat = 0
+      if (!wasEnabled) await queue(waiting(comments, session))
     } else {
       pending = []
       firstAt = 0

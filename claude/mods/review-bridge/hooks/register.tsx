@@ -29,9 +29,19 @@ export const register: Register = on => {
       })
     }
     const isEnabled = (await $.store.get(`enabled:${root}`)) !== false
+    const reported = new Set<string>()
+    const fault = (where: string, error: unknown) => {
+      const text = `review-bridge: ${where}: ${error instanceof Error ? error.message : String(error)}`
+      if (reported.has(text)) return
+      reported.add(text)
+      $.ui.log(text)
+    }
     $.ui.status(undefined)
     bridge = createBridge({
-      stat: path => $.fs.stat(path).then(s => s.mtimeMs, () => undefined),
+      stat: path => $.fs.stat(path).then(s => s.mtimeMs, error => {
+        if (!/ENOENT/.test(String((error as { code?: string })?.code ?? error))) fault(`stat ${path}`, error)
+        return undefined
+      }),
       read: async path => String(await $.fs.read(path)),
       write: (path, text) => $.fs.write(path, text),
       now: () => $.clock.now(),
@@ -66,9 +76,9 @@ export const register: Register = on => {
       description: 'Watch review comments and react to each one as it appears',
     })
     for (const spec of TOOL_SPECS) await $.tool.register({ ...spec, isDeferred: false })
-    await bridge.start().catch(() => undefined)
+    await bridge.start().catch(error => fault('start', error))
     $.clock.every(POLL_MS, () => {
-      void bridge?.tick().catch(() => undefined)
+      void bridge?.tick().catch(error => fault('tick', error))
     })
     return next(e)
   })
